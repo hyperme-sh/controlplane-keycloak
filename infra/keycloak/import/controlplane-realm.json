@@ -38,5 +38,23 @@
         "pkce.code.challenge.method": "S256"
       }
     }
+  ],
+  "users": [
+    {
+      "username": "admin@example.com",
+      "enabled": true,
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "User",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test@123!",
+          "temporary": false
+        }
+      ]
+    }
   ]
 }
