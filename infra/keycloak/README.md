@@ -14,12 +14,11 @@ Compose uses a dedicated Postgres database `keycloak` (`KC_DB_URL` → `jdbc:pos
 
 - **Public issuer** (matches the `iss` claim in access tokens when you open the admin UI from the host):  
   `http://localhost:8081/realms/controlplane`
-- **JWKS** (used by the API to validate RS256 signatures):  
-  `http://localhost:8081/realms/controlplane/protocol/openid-certs`  
-  From other Docker services, the same keys are available at:  
-  `http://keycloak:8080/realms/controlplane/protocol/openid-certs`
+- **JWKS** (used by the API to validate RS256 signatures): use **`jwks_uri`** from the realm OpenID configuration. Keycloak **26+**:  
+  `http://localhost:8081/realms/controlplane/protocol/openid-connect/certs`  
+  (older Keycloak versions used `.../protocol/openid-certs`.)
 
-The API should fetch JWKS from the URL reachable inside its network (`keycloak:8080` in Compose) while validating that `iss` equals the **browser-facing** issuer above (see `KEYCLOAK_ISSUER` in `docker-compose.yaml`).
+**Docker Compose:** API containers use **`http://host.docker.internal:8081/.../openid-connect/certs`** with **`extra_hosts: host.docker.internal:host-gateway`** so JWKS is fetched through the host-mapped Keycloak port. `iss` must still match the browser-facing issuer (see `KEYCLOAK_ISSUER` in `docker-compose.yaml`).
 
 ## Realm import
 
