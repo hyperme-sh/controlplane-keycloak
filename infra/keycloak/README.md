@@ -22,7 +22,19 @@ Compose uses a dedicated Postgres database `keycloak` (`KC_DB_URL` → `jdbc:pos
 
 ## Realm import
 
-On first start with `--import-realm`, Keycloak loads [import/controlplane-realm.json](import/controlplane-realm.json) (realm `controlplane`, public client `controlplane-frontend` with PKCE).
+On first start with `--import-realm`, Keycloak loads [import/controlplane-realm.json](import/controlplane-realm.json) (realm `controlplane`).
+
+### OAuth2 / OIDC clients (Phase 3)
+
+| Client ID | Flow | Notes |
+|-----------|------|--------|
+| `controlplane-frontend` | Authorization Code + **PKCE** | Next.js / Vite web console |
+| `controlplane-mobile` | Authorization Code + **PKCE** | Expo / React Native; adjust `redirectUris` for your app scheme |
+| `controlplane-device` | **Device Authorization Grant** | CLI, embedded; enable in client **Advanced** if import omits it |
+| `controlplane-m2m` | **Client Credentials** | Confidential; default secret `dev-m2m-client-secret-change-me` — **rotate in prod** |
+| `controlplane-api-key` | (placeholder) | `azp` for gateway-minted HS256 tokens; not a Keycloak login client |
+
+JWT validation in the API allows any `azp` in `KEYCLOAK_ALLOWED_CLIENT_IDS` (see `docker-compose.yaml`). API keys are validated separately via [api-keys-service](../../core/api-keys-service/) and exchanged for short-lived HS256 tokens (`API_KEY_EXCHANGE_JWT_SECRET`).
 
 ### Dev bootstrap user (matches API seed)
 
