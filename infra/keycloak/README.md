@@ -4,7 +4,7 @@
 
 The **Keycloak Admin Console** at `http://localhost:8081/admin/` uses the **`master`** realm. Sign in with the bootstrap admin from Compose (`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`, e.g. `admin` / `admin123`) — **not** `admin@example.com`. The `user_not_found` / wrong-realm errors in logs usually mean someone tried the app user on the admin console.
 
-The **`controlplane`** realm user `admin@example.com` is for the **SPA** (OIDC) only. If you see `expired_code`, close the tab and start the login again (stale OAuth state).
+The **`controlplane`** realm dev user `chris@fyberlabs.com` is for the **SPA** (OIDC) only. If you see `expired_code`, close the tab and start the login again (stale OAuth state).
 
 ## Database
 
@@ -31,10 +31,20 @@ The realm file includes a **platform admin** user so you can sign in to the SPA 
 
 | Field | Value |
 |--------|--------|
-| Username / email | `admin@example.com` |
+| Username / email | `chris@fyberlabs.com` |
 | Password | `Test@123!` (same as `ADMIN_PASSWORD` in `docker-compose.yaml`) |
 
 The API seeds a row in PostgreSQL with the same `ADMIN_EMAIL` on startup in `FASTAPI_ENV=development` (see `controlplane-core` `seed_initial_data`). After first OIDC login, `keycloak_sub` is filled on that user. If you already imported the realm **without** this user, add the user in the Keycloak admin console or wipe Keycloak’s DB/volume and re-import.
+
+### Microsoft Entra — `groups` claim and platform ADMIN
+
+To grant **ADMIN** from Entra membership in a single-tenant setup:
+
+1. In Entra, note the **Object ID** of the admin security group.
+2. In Keycloak (broker or token mapper), ensure the access token includes a **`groups`** claim (list of group IDs or names as emitted by your mapper).
+3. Set **`ENTRA_ADMIN_GROUP_IDS`** on the API (comma-separated object IDs, case-insensitive). On JIT user create/link, if any token group matches, the user gets the **ADMIN** role.
+
+Alternatively, add the user’s email to **`BOOTSTRAP_ADMIN_EMAILS`** or rely on **`ADMIN_EMAIL`** matching the signed-in account. See [OIDC console env](../../docs/oidc-console.md#backend-compose--env).
 
 ## Identity providers (configure in Admin Console)
 
@@ -51,6 +61,24 @@ Add brokers under **Identity providers** so users sign in via Keycloak (one host
 | X (Twitter) | OAuth 2.0 (often custom) | Fragile; add last |
 
 Use Keycloak docs for each template; redirect URIs must point to Keycloak (not the SPA).
+
+### Microsoft Entra ID — redirect URI (AADSTS50011)
+
+Entra validates the **broker callback** Keycloak uses, not the Vite URL. The path includes your realm and the **Identity provider alias** from Keycloak (the slug in the admin URL, e.g. `microsoft`).
+
+Add this **exact** redirect URI in the Entra app registration: **Authentication → Add a platform → Web → Redirect URIs** (or edit an existing Web platform):
+
+```text
+http://localhost:8081/realms/controlplane/broker/microsoft/endpoint
+```
+
+Replace `microsoft` if your IdP alias is different. In Keycloak: **Identity providers →** your provider → copy the **Redirect URI** shown there and paste it into Entra (match **scheme, host, port, path** — no extra trailing slash unless Keycloak shows one).
+
+If Keycloak is on another host/port (e.g. production), register that full broker URL in Entra instead. Using `https` in Entra but sending `http` from Keycloak (or the reverse) will also trigger `AADSTS50011`.
+
+### Broker users: email in the **access** token
+
+The control plane API only sees the **Bearer access token** on `/account/me`. If the SPA loads in Keycloak but the app says your user is missing, the token often lacks a valid **`email`** (or UPN-style) claim. In the Keycloak admin UI, add an **Identity provider mapper** (or user attribute mapper) so the IdP’s mail/UPN is copied into OIDC claims the client receives, and keep the **`email`** client scope on `controlplane-frontend`. See [OIDC console — backend env](../../docs/oidc-console.md#backend-compose--env) for `OIDC_EXTRA_EMAIL_CLAIMS` if your IdP uses a non-standard claim name.
 
 ## MFA
 
