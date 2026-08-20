@@ -10,6 +10,247 @@
   "resetPasswordAllowed": true,
   "bruteForceProtected": true,
   "accessTokenLifespan": 300,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "otpPolicyCodeReusable": false,
+  "otpSupportedApplications": [
+    "totpAppMicrosoftAuthenticatorName",
+    "totpAppGoogleName",
+    "totpAppFreeOTPName"
+  ],
+  "webAuthnPolicyRpEntityName": "Control Plane",
+  "webAuthnPolicySignatureAlgorithms": ["ES256", "RS256"],
+  "webAuthnPolicyRpId": "",
+  "webAuthnPolicyAttestationConveyancePreference": "not specified",
+  "webAuthnPolicyAuthenticatorAttachment": "not specified",
+  "webAuthnPolicyRequireResidentKey": "not specified",
+  "webAuthnPolicyUserVerificationRequirement": "preferred",
+  "webAuthnPolicyCreateTimeout": 60,
+  "webAuthnPolicyAvoidSameAuthenticatorRegister": false,
+  "webAuthnPolicyAcceptableAaguids": [],
+  "webAuthnPolicyPasswordlessRpEntityName": "Control Plane",
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256", "RS256"],
+  "webAuthnPolicyPasswordlessRpId": "",
+  "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
+  "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
+  "webAuthnPolicyPasswordlessRequireResidentKey": "not specified",
+  "webAuthnPolicyPasswordlessUserVerificationRequirement": "preferred",
+  "webAuthnPolicyPasswordlessCreateTimeout": 60,
+  "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister": false,
+  "webAuthnPolicyPasswordlessAcceptableAaguids": [],
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "TERMS_AND_CONDITIONS",
+      "name": "Terms and Conditions",
+      "providerId": "TERMS_AND_CONDITIONS",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 20,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    },
+    {
+      "alias": "delete_account",
+      "name": "Delete Account",
+      "providerId": "delete_account",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 60,
+      "config": {}
+    },
+    {
+      "alias": "webauthn-register",
+      "name": "Webauthn Register",
+      "providerId": "webauthn-register",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 70,
+      "config": {}
+    },
+    {
+      "alias": "webauthn-register-passwordless",
+      "name": "Webauthn Register Passwordless",
+      "providerId": "webauthn-register-passwordless",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 80,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_PROFILE",
+      "name": "Verify Profile",
+      "providerId": "VERIFY_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 90,
+      "config": {}
+    },
+    {
+      "alias": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "name": "Recovery Authentication Codes",
+      "providerId": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 110,
+      "config": {}
+    },
+    {
+      "alias": "update_user_locale",
+      "name": "Update User Locale",
+      "providerId": "update_user_locale",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 1000,
+      "config": {}
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "microsoft",
+      "displayName": "Microsoft Entra",
+      "providerId": "oidc",
+      "enabled": true,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "hideOnLogin": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "guiOrder": "1",
+        "syncMode": "IMPORT",
+        "clientAuthMethod": "client_secret_post",
+        "clientId": "${KC_IDP_MICROSOFT_CLIENT_ID:unset-microsoft-client-id}",
+        "clientSecret": "${KC_IDP_MICROSOFT_CLIENT_SECRET:unset-microsoft-client-secret}",
+        "authorizationUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/authorize",
+        "tokenUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/token",
+        "logoutUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/logout",
+        "userInfoUrl": "https://graph.microsoft.com/oidc/userinfo",
+        "issuer": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/v2.0",
+        "jwksUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/discovery/v2.0/keys",
+        "validateSignature": "true",
+        "useJwksUrl": "true",
+        "pkceEnabled": "true",
+        "pkceMethod": "S256",
+        "defaultScope": "openid profile email"
+      }
+    },
+    {
+      "alias": "github",
+      "displayName": "GitHub",
+      "providerId": "github",
+      "enabled": true,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": false,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "hideOnLogin": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "guiOrder": "2",
+        "syncMode": "IMPORT",
+        "clientId": "${KC_IDP_GITHUB_CLIENT_ID:unset-github-client-id}",
+        "clientSecret": "${KC_IDP_GITHUB_CLIENT_SECRET:unset-github-client-secret}",
+        "defaultScope": "user:email"
+      }
+    },
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": true,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "hideOnLogin": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "guiOrder": "3",
+        "syncMode": "IMPORT",
+        "clientId": "${KC_IDP_GOOGLE_CLIENT_ID:unset-google-client-id}",
+        "clientSecret": "${KC_IDP_GOOGLE_CLIENT_SECRET:unset-google-client-secret}",
+        "defaultScope": "openid profile email"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "name": "microsoft-email",
+      "identityProviderAlias": "microsoft",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "claim": "email",
+        "user.attribute": "email"
+      }
+    },
+    {
+      "name": "github-email",
+      "identityProviderAlias": "github",
+      "identityProviderMapper": "github-user-attribute-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "jsonField": "email",
+        "userAttribute": "email"
+      }
+    },
+    {
+      "name": "google-email",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "google-user-attribute-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "jsonField": "email",
+        "userAttribute": "email"
+      }
+    }
+  ],
   "clients": [
     {
       "clientId": "controlplane-frontend",

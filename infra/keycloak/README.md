@@ -57,21 +57,35 @@ To grant **ADMIN** from Entra membership in a single-tenant setup:
 
 Alternatively, add the user’s email to **`BOOTSTRAP_ADMIN_EMAILS`** or rely on **`ADMIN_EMAIL`** matching the signed-in account. See [OIDC console env](../../docs/oidc-console.md#backend-compose--env).
 
-## Identity providers (configure in Admin Console)
+## Identity providers (imported brokers)
 
-Add brokers under **Identity providers** so users sign in via Keycloak (one hosted login; no per-provider OAuth in FastAPI):
+The realm import declares three brokers so Keycloak (and the Next.js console via `kc_idp_hint`) can offer the same IdPs FyberLabs/infra uses for GitLab: **Microsoft Entra**, **GitHub**, and **Google**. Aliases are `microsoft`, `github`, and `google`.
 
-| Provider | Type in Keycloak | Notes |
-|----------|------------------|--------|
-| Google | OpenID Connect / Google | Client ID + secret from Google Cloud Console |
-| GitHub | OpenID Connect / GitHub | OAuth App callback URL → Keycloak broker |
-| Microsoft Entra (internal) | OpenID Connect | Tenant-specific issuer + app registration |
-| Microsoft Entra (external / multi-tenant) | OpenID Connect | Common endpoint + separate app registration |
-| Microsoft Entra (SAML) | SAML 2.0 | Enterprise app SAML metadata |
-| Facebook | OpenID Connect / Facebook | App ID + secret |
-| X (Twitter) | OAuth 2.0 (often custom) | Fragile; add last |
+Client IDs and secrets are **not** committed. Keycloak substitutes `${ENV:default}` placeholders on `--import-realm` (first start only; later restarts skip an existing realm).
 
-Use Keycloak docs for each template; redirect URIs must point to Keycloak (not the SPA).
+| Alias | Display name | Type | Env vars | Default if unset |
+|-------|--------------|------|----------|------------------|
+| `microsoft` | Microsoft Entra | OpenID Connect (Entra tenant issuer) | `KC_IDP_MICROSOFT_CLIENT_ID`, `KC_IDP_MICROSOFT_CLIENT_SECRET`, `KC_IDP_MICROSOFT_TENANT_ID` | `unset-microsoft-client-*`, tenant `common` |
+| `github` | GitHub | GitHub | `KC_IDP_GITHUB_CLIENT_ID`, `KC_IDP_GITHUB_CLIENT_SECRET` | `unset-github-client-*` |
+| `google` | Google | Google | `KC_IDP_GOOGLE_CLIENT_ID`, `KC_IDP_GOOGLE_CLIENT_SECRET` | `unset-google-client-*` |
+
+### How to fill client ID / secret
+
+1. **Host env / Compose** — set the `KC_IDP_*` variables before the **first** Keycloak import (`docker compose up` with a fresh `keycloak` DB). Compose already forwards these names; later Key Vault can inject the same keys.
+2. **Keycloak Admin Console** — **Identity providers →** Microsoft Entra / GitHub / Google → paste Client ID and Client Secret (and Entra tenant ID if not `common`). Use this after the realm already exists.
+3. **Later Key Vault** — store the same `KC_IDP_*` names; do not put live secrets in git.
+
+Until real values are set, the broker buttons exist but the upstream IdP will reject the placeholder client id.
+
+Register **broker** redirect URIs at each IdP (not the SPA origin):
+
+| Provider | Local callback |
+|----------|----------------|
+| Microsoft Entra | `http://localhost:8081/realms/controlplane/broker/microsoft/endpoint` |
+| GitHub | `http://localhost:8081/realms/controlplane/broker/github/endpoint` |
+| Google | `http://localhost:8081/realms/controlplane/broker/google/endpoint` |
+
+Other providers (Facebook, X, SAML Entra) can still be added in Admin Console if needed.
 
 ### Microsoft Entra ID — redirect URI (AADSTS50011)
 
@@ -93,7 +107,11 @@ The control plane API only sees the **Bearer access token** on `/account/me`. If
 
 ## MFA
 
-Enable **OTP** or **WebAuthn** under **Authentication → Policies** and **Required actions** (e.g. **Configure OTP** for privileged groups). Start with optional TOTP, then require for realm-admin roles in production.
+The realm import **configures** OTP (TOTP) and WebAuthn as optional required actions (`CONFIGURE_TOTP`, `webauthn-register`, `webauthn-register-passwordless`, recovery codes). They are **enabled but not default** (`defaultAction: false`) so the local password user `chris@fyberlabs.com` can still sign in without enrolling.
+
+Keycloak’s default browser flow already includes **Conditional OTP**: after a user enrolls TOTP (Account Console or an admin-assigned required action), they are prompted. WebAuthn is available as a required action the same way.
+
+To **require** MFA for everyone later: set **Configure OTP** (or WebAuthn) as a default required action in Admin Console, or assign it to a group/role. Do not flip `defaultAction` in the import to `true` unless you want first login to force enrollment (breaks unattended local password smoke tests).
 
 ## SPA env (interim Vite / future Next.js)
 
