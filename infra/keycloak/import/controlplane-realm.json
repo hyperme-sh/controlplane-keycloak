@@ -361,7 +361,7 @@
       "emailVerified": true,
       "firstName": "Chris",
       "lastName": "Fyberlabs",
-      "requiredActions": [],
+      "requiredActions": ["CONFIGURE_TOTP"],
       "credentials": [
         {
           "type": "password",

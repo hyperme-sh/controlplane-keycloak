@@ -44,8 +44,9 @@ The realm file includes a **platform admin** user so you can sign in to the SPA 
 |--------|--------|
 | Username / email | `chris@fyberlabs.com` |
 | Password | `Test@123!` (same as `ADMIN_PASSWORD` in `docker-compose.yaml`) |
+| First login | `CONFIGURE_TOTP` (user required action; WebAuthn is not required) |
 
-The API seeds a row in PostgreSQL with the same `ADMIN_EMAIL` on startup in `FASTAPI_ENV=development` (see `controlplane-core` `seed_initial_data`). After first OIDC login, `keycloak_sub` is filled on that user. If you already imported the realm **without** this user, add the user in the Keycloak admin console or wipe Keycloak’s DB/volume and re-import.
+The API seeds **roles** on every environment (`admin`, `user`, `guest`, `billing_manager`) so OIDC JIT can resolve `GUEST` / `ADMIN`. A hashed `ADMIN_PASSWORD` user and 100 fake guests run only when `FASTAPI_ENV=development`. After first OIDC login, `keycloak_sub` is filled and `ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_EMAILS` still promote JIT to `admin`. If you already imported the realm **without** this user, add the user in the Keycloak admin console or wipe Keycloak’s DB/volume and re-import.
 
 ### Microsoft Entra — `groups` claim and platform ADMIN
 
@@ -107,11 +108,13 @@ The control plane API only sees the **Bearer access token** on `/account/me`. If
 
 ## MFA
 
-The realm import **configures** OTP (TOTP) and WebAuthn as optional required actions (`CONFIGURE_TOTP`, `webauthn-register`, `webauthn-register-passwordless`, recovery codes). They are **enabled but not default** (`defaultAction: false`) so the local password user `chris@fyberlabs.com` can still sign in without enrolling.
+The realm import **configures** OTP (TOTP) and WebAuthn as optional required actions (`CONFIGURE_TOTP`, `webauthn-register`, `webauthn-register-passwordless`, recovery codes). They are **enabled but not default** (`defaultAction: false`) so unattended local smoke that never completes `chris@fyberlabs.com` login still works (`test_mfa_is_optional_but_configured`).
+
+The imported `chris@fyberlabs.com` user has `CONFIGURE_TOTP` as a **user** required action (first real login enrolls TOTP). WebAuthn stays available and preferred for that mailbox; it is **not** a required action, so it does not block first TEST Checkout.
 
 Keycloak’s default browser flow already includes **Conditional OTP**: after a user enrolls TOTP (Account Console or an admin-assigned required action), they are prompted. WebAuthn is available as a required action the same way.
 
-To **require** MFA for everyone later: set **Configure OTP** (or WebAuthn) as a default required action in Admin Console, or assign it to a group/role. Do not flip `defaultAction` in the import to `true` unless you want first login to force enrollment (breaks unattended local password smoke tests).
+To **require** MFA for everyone later: set **Configure OTP** (or WebAuthn) as a default required action in Admin Console, or assign it to a group/role. Do not flip `defaultAction` in the import to `true` unless you want first login to force enrollment for every user (breaks unattended local password smoke tests).
 
 ## SPA env (interim Vite / future Next.js)
 
