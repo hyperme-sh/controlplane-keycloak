@@ -36,15 +36,15 @@ On first start with `--import-realm`, Keycloak loads [import/controlplane-realm.
 
 JWT validation in the API allows any `azp` in `KEYCLOAK_ALLOWED_CLIENT_IDS` (see `docker-compose.yaml`). API keys are validated separately via [api-keys-service](../../core/api-keys-service/) and exchanged for short-lived HS256 tokens (`API_KEY_EXCHANGE_JWT_SECRET`).
 
-### Dev bootstrap user (matches API seed)
+### Bootstrap user (OIDC / IdP, not a standing password)
 
-The realm file includes a **platform admin** user so you can sign in to the SPA without hand-creating a user in the Keycloak UI:
+The realm file includes `chris@fyberlabs.com` so the test plane has one mailbox without hand-creating a user in the Keycloak UI:
 
 | Field | Value |
 |--------|--------|
 | Username / email | `chris@fyberlabs.com` |
-| Password | `Test@123!` (same as `ADMIN_PASSWORD` in `docker-compose.yaml`) |
-| First login | `CONFIGURE_TOTP` (user required action; WebAuthn is not required) |
+| Password | none in git (no standing password in the realm import) |
+| First login | `UPDATE_PASSWORD` + `CONFIGURE_TOTP` (user required actions; WebAuthn is not required) |
 
 The API seeds **roles** on every environment (`admin`, `user`, `guest`, `billing_manager`) so OIDC JIT can resolve `GUEST` / `ADMIN`. A hashed `ADMIN_PASSWORD` user and 100 fake guests run only when `FASTAPI_ENV=development`. After first OIDC login, `keycloak_sub` is filled and `ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_EMAILS` still promote JIT to `admin`. If you already imported the realm **without** this user, add the user in the Keycloak admin console or wipe Keycloak’s DB/volume and re-import.
 
@@ -110,7 +110,7 @@ The control plane API only sees the **Bearer access token** on `/account/me`. If
 
 The realm import **configures** OTP (TOTP) and WebAuthn as optional required actions (`CONFIGURE_TOTP`, `webauthn-register`, `webauthn-register-passwordless`, recovery codes). They are **enabled but not default** (`defaultAction: false`) so unattended local smoke that never completes `chris@fyberlabs.com` login still works (`test_mfa_is_optional_but_configured`).
 
-The imported `chris@fyberlabs.com` user has `CONFIGURE_TOTP` as a **user** required action (first real login enrolls TOTP). WebAuthn stays available and preferred for that mailbox; it is **not** a required action, so it does not block first TEST Checkout.
+The imported `chris@fyberlabs.com` user has no password in git. First login uses an IdP broker (or a password Chris sets in Admin Console / reset mail). User required actions are `UPDATE_PASSWORD` + `CONFIGURE_TOTP`. WebAuthn stays available and preferred for that mailbox; it is **not** a required action, so it does not block first TEST Checkout. `OIDC_REQUIRE_MFA` stays false until after first login.
 
 Keycloak’s default browser flow already includes **Conditional OTP**: after a user enrolls TOTP (Account Console or an admin-assigned required action), they are prompted. WebAuthn is available as a required action the same way.
 
