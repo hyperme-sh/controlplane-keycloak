@@ -2,7 +2,7 @@
 
 ## Admin console vs application login
 
-The **Keycloak Admin Console** at `http://localhost:8081/admin/` uses the **`master`** realm. Sign in with the bootstrap admin from Compose (`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`, e.g. `admin` / `admin123`) — **not** `admin@example.com`. The `user_not_found` / wrong-realm errors in logs usually mean someone tried the app user on the admin console.
+The **Keycloak Admin Console** at `http://localhost:8081/admin/` uses the **`master`** realm. Sign in with the bootstrap admin from Compose (`KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`, e.g. laptop defaults `admin` / `admin123`) — **not** `admin@example.com`. The `user_not_found` / wrong-realm errors in logs usually mean someone tried the app user on the admin console. Keycloak **26+** (`quay.io/keycloak/keycloak:26.5`) uses these `KC_BOOTSTRAP_ADMIN_*` names, not `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD`.
 
 The **`controlplane`** realm dev user `chris@fyberlabs.com` is for the **SPA** (OIDC) only. If you see `expired_code`, close the tab and start the login again (stale OAuth state).
 
