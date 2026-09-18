@@ -22,7 +22,14 @@ Compose uses a dedicated Postgres database `keycloak` (`KC_DB_URL` → `jdbc:pos
 
 ## Realm import
 
-On first start with `--import-realm`, Keycloak loads [import/controlplane-realm.json](import/controlplane-realm.json) (realm `controlplane`).
+On first start with `--import-realm`, Keycloak loads [import/controlplane-realm.json](import/controlplane-realm.json) (realm `controlplane`). Later restarts **skip** an already-imported realm. Changing redirect URIs in git does not update a live `auth.test` client.
+
+`controlplane-frontend` Valid redirect URIs include localhost Next/Vite plus `https://portal.test.hyperme.sh/*`, `https://portal.test.hyperme.sh/api/auth/callback`, and `https://portal.test.hyperme.sh/api/auth/callback/keycloak` (Auth.js Keycloak provider). Web origin: `https://portal.test.hyperme.sh`. Do not invent a second client.
+
+After merge, apply those URIs on the live client (existing admin path — no new seed):
+
+1. **Admin Console** — `https://auth.test.hyperme.sh/admin/` (master realm, `KC_BOOTSTRAP_ADMIN_*` / KV `panopticon-test-keycloak-admin-password`) → realm `controlplane` → Clients → `controlplane-frontend` → Valid redirect URIs + Web origins.
+2. **Admin REST / `kcadm`** — same `admin-cli` token `seed_pan_test_identities.py` already uses. GET `/admin/realms/controlplane/clients?clientId=controlplane-frontend`, then PUT the client representation with the extra URIs. The seed itself only upserts identities + the groups mapper; it does **not** patch redirects.
 
 ### OAuth2 / OIDC clients (Phase 3)
 
