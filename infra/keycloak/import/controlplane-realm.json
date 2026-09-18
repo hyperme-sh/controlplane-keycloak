@@ -251,6 +251,40 @@
       }
     }
   ],
+  "roles": {
+    "realm": [
+      {
+        "name": "renter",
+        "description": "Portal renter. Existing grant path for can_checkout / can_see_leases.",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "host",
+        "description": "Portal host. Existing grant path for can_see_host_status / sell_state.",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "admin",
+        "description": "Portal admin (customer-support). Not KC_BOOTSTRAP_ADMIN. No can_checkout.",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "renter",
+      "path": "/renter",
+      "realmRoles": ["renter"]
+    },
+    {
+      "name": "host",
+      "path": "/host",
+      "realmRoles": ["host"]
+    }
+  ],
   "clients": [
     {
       "clientId": "controlplane-frontend",
@@ -281,7 +315,22 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "controlplane-mobile",
@@ -362,6 +411,39 @@
       "firstName": "Chris",
       "lastName": "Fyberlabs",
       "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
+    },
+    {
+      "username": "renter@test.hyperme.sh",
+      "enabled": true,
+      "email": "renter@test.hyperme.sh",
+      "emailVerified": true,
+      "firstName": "Pan-test",
+      "lastName": "Renter",
+      "requiredActions": [],
+      "groups": ["/renter"],
+      "realmRoles": ["renter"]
+    },
+    {
+      "username": "leaser@test.hyperme.sh",
+      "enabled": true,
+      "email": "leaser@test.hyperme.sh",
+      "emailVerified": true,
+      "firstName": "Pan-test",
+      "lastName": "Leaser",
+      "requiredActions": [],
+      "groups": ["/host"],
+      "realmRoles": ["host"]
+    },
+    {
+      "username": "admin@test.hyperme.sh",
+      "enabled": true,
+      "email": "admin@test.hyperme.sh",
+      "emailVerified": true,
+      "firstName": "Pan-test",
+      "lastName": "Admin",
+      "requiredActions": [],
+      "groups": [],
+      "realmRoles": ["admin"]
     }
   ]
 }

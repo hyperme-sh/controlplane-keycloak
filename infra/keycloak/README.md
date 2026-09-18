@@ -48,6 +48,8 @@ The realm file includes `chris@fyberlabs.com` so the test plane has one mailbox 
 
 The API seeds **roles** on every environment (`admin`, `user`, `guest`, `billing_manager`) so OIDC JIT can resolve `GUEST` / `ADMIN`. A hashed `ADMIN_PASSWORD` user and 100 fake guests run only when `FASTAPI_ENV=development`. After first OIDC login, `keycloak_sub` is filled and `ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_EMAILS` still promote JIT to `admin`. If you already imported the realm **without** this user, add the user in the Keycloak admin console or wipe Keycloak’s DB/volume and re-import.
 
+Split pan-test users (`renter@test.hyperme.sh`, `leaser@test.hyperme.sh`, `admin@test.hyperme.sh`) are documented below. They are not this mailbox and they are not `KC_BOOTSTRAP_ADMIN_*`.
+
 ### Microsoft Entra — `groups` claim and platform ADMIN
 
 To grant **ADMIN** from Entra membership in a single-tenant setup:
@@ -111,6 +113,33 @@ The control plane API only sees the **Bearer access token** on `/account/me`. If
 The realm import **configures** OTP (TOTP) and WebAuthn as optional required actions (`CONFIGURE_TOTP`, `webauthn-register`, `webauthn-register-passwordless`, recovery codes). They are **enabled but not default** (`defaultAction: false`) so unattended local smoke that never completes `chris@fyberlabs.com` login still works (`test_mfa_is_optional_but_configured`).
 
 The imported `chris@fyberlabs.com` user has no password in git. First login uses an IdP broker (or a password Chris sets in Admin Console / reset mail). User required actions are `UPDATE_PASSWORD` + `CONFIGURE_TOTP`. WebAuthn stays available and preferred for that mailbox; it is **not** a required action, so it does not block first TEST Checkout. `OIDC_REQUIRE_MFA` stays false until after first login.
+
+### Pan-test identities (renter / leaser / admin)
+
+Three **split** controlplane users for the test plane. Never one user with all roles. `controlplane-frontend` stays public PKCE; direct access grants stay off.
+
+| Username / email | Portal grant path | Not |
+|------------------|-------------------|-----|
+| `renter@test.hyperme.sh` | Keycloak group `/renter` + realm role `renter` → `can_checkout` / `can_see_leases` / mint keys | host |
+| `leaser@test.hyperme.sh` | Keycloak group `/host` + realm role `host` → `can_see_host_status` (own host posture / `sell_state`) | `can_checkout`. There is **no** `leaser` role or group. |
+| `admin@test.hyperme.sh` | New portal realm role `admin` (customer-support / user / org). Not `KC_BOOTSTRAP_ADMIN_*`. | renter, host, `can_checkout`. No refund/coupon API or screens in this seed. RoleNav still switches Renter\|Host. |
+
+`evaluate_portal_controls` reads those Keycloak groups (and same-named realm roles). The `admin` role is org/support admin only: invite/assign/mint/IR. It does **not** inherit renter or host grants.
+
+Keycloak `--import-realm` creates the users/groups/roles on **first** start only, with **no passwords** and **no** `UPDATE_PASSWORD` / `CONFIGURE_TOTP` (do not copy the chris required actions). Re-import is not idempotent for an existing realm. Run the upsert seed after Keycloak is up:
+
+```bash
+# Env vars must already be present (refresh injects from KV). Empty fails closed.
+python3 infra/keycloak/seed_pan_test_identities.py
+```
+
+| Env var | Key Vault (`kv-fyber-cg47`) |
+|---------|-----------------------------|
+| `PANOPTICON_TEST_RENTER_PASSWORD` | `panopticon-test-renter-password` |
+| `PANOPTICON_TEST_LEASER_PASSWORD` | `panopticon-test-leaser-password` |
+| `PANOPTICON_TEST_PORTAL_ADMIN_PASSWORD` | `panopticon-test-portal-admin-password` |
+
+Do **not** reuse `panopticon-test-keycloak-admin-password` (`KC_BOOTSTRAP_ADMIN_PASSWORD`) or `panopticon-test-admin-password` (`ADMIN_PASSWORD`). Research applies the three values into that vault after Sign-off and wires refresh to inject the env names. The seed never generates a password into git. Rerun does not rotate passwords unless you pass `--rotate-passwords`.
 
 Keycloak’s default browser flow already includes **Conditional OTP**: after a user enrolls TOTP (Account Console or an admin-assigned required action), they are prompted. WebAuthn is available as a required action the same way.
 
