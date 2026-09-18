@@ -48,7 +48,7 @@ The realm file includes `chris@fyberlabs.com` so the test plane has one mailbox 
 
 The API seeds **roles** on every environment (`admin`, `user`, `guest`, `billing_manager`) so OIDC JIT can resolve `GUEST` / `ADMIN`. A hashed `ADMIN_PASSWORD` user and 100 fake guests run only when `FASTAPI_ENV=development`. After first OIDC login, `keycloak_sub` is filled and `ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_EMAILS` still promote JIT to `admin`. If you already imported the realm **without** this user, add the user in the Keycloak admin console or wipe Keycloak’s DB/volume and re-import.
 
-Split pan-test users (`renter@test.hyperme.sh`, `leaser@test.hyperme.sh`, `admin@test.hyperme.sh`) are documented below. They are not this mailbox and they are not `KC_BOOTSTRAP_ADMIN_*`.
+Split pan-test users (`renter`, `leaser`, `admin`) are documented below. They are not this mailbox. Controlplane user `admin` is not `KC_BOOTSTRAP_ADMIN_*` (master realm).
 
 ### Microsoft Entra — `groups` claim and platform ADMIN
 
@@ -118,11 +118,11 @@ The imported `chris@fyberlabs.com` user has no password in git. First login uses
 
 Three **split** controlplane users for the test plane. Never one user with all roles. `controlplane-frontend` stays public PKCE; direct access grants stay off.
 
-| Username / email | Portal grant path | Not |
-|------------------|-------------------|-----|
-| `renter@test.hyperme.sh` | Keycloak group `/renter` + realm role `renter` → `can_checkout` / `can_see_leases` / mint keys | host |
-| `leaser@test.hyperme.sh` | Keycloak group `/host` + realm role `host` → `can_see_host_status` (own host posture / `sell_state`) | `can_checkout`. There is **no** `leaser` role or group. |
-| `admin@test.hyperme.sh` | New portal realm role `admin` (customer-support / user / org). Not `KC_BOOTSTRAP_ADMIN_*`. | renter, host, `can_checkout`. No refund/coupon API or screens in this seed. RoleNav still switches Renter\|Host. |
+| Username | Email | Portal grant path | Not |
+|----------|-------|-------------------|-----|
+| `renter` | `renter@test.hyperme.sh` | Keycloak group `/renter` + realm role `renter` → `can_checkout` / `can_see_leases` / mint keys | host |
+| `leaser` | `leaser@test.hyperme.sh` | Keycloak group `/host` + realm role `host` → `can_see_host_status` (own host posture / `sell_state`) | `can_checkout`. There is **no** `leaser` role or group. |
+| `admin` | `admin@test.hyperme.sh` | New portal realm role `admin` (customer-support / user / org). Not `KC_BOOTSTRAP_ADMIN_*`. | renter, host, `can_checkout`. No refund/coupon API or screens in this seed. RoleNav still switches Renter\|Host. |
 
 `evaluate_portal_controls` reads those Keycloak groups (and same-named realm roles). The `admin` role is org/support admin only: invite/assign/mint/IR. It does **not** inherit renter or host grants.
 

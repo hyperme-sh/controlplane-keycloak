@@ -3,9 +3,9 @@
 
 Creates or updates three split users (never one user with all roles):
 
-* renter@test.hyperme.sh — Keycloak group/role ``renter`` (can_checkout)
-* leaser@test.hyperme.sh — Keycloak group/role ``host`` (not a leaser role)
-* admin@test.hyperme.sh — Keycloak realm role ``admin`` (portal admin;
+* user ``renter`` — Keycloak group/role ``renter`` (can_checkout)
+* user ``leaser`` — Keycloak group/role ``host`` (not a leaser role)
+* user ``admin`` — Keycloak realm role ``admin`` (portal admin;
   not KC_BOOTSTRAP_ADMIN, not renter, not host)
 
 Passwords are read from env vars that refresh injects from Key Vault
@@ -61,7 +61,7 @@ class Identity:
 
 IDENTITIES: tuple[Identity, ...] = (
     Identity(
-        username="renter@test.hyperme.sh",
+        username="renter",
         email="renter@test.hyperme.sh",
         first_name="Pan-test",
         last_name="Renter",
@@ -71,7 +71,7 @@ IDENTITIES: tuple[Identity, ...] = (
         kv_secret="panopticon-test-renter-password",
     ),
     Identity(
-        username="leaser@test.hyperme.sh",
+        username="leaser",
         email="leaser@test.hyperme.sh",
         first_name="Pan-test",
         last_name="Leaser",
@@ -81,7 +81,7 @@ IDENTITIES: tuple[Identity, ...] = (
         kv_secret="panopticon-test-leaser-password",
     ),
     Identity(
-        username="admin@test.hyperme.sh",
+        username="admin",
         email="admin@test.hyperme.sh",
         first_name="Pan-test",
         last_name="Admin",
@@ -96,8 +96,8 @@ IDENTITIES: tuple[Identity, ...] = (
 def catalog_invariants() -> None:
     """Static guards. No leaser role/group; no reused bootstrap KV names."""
     names = [ident.username for ident in IDENTITIES]
-    if len(names) != len(set(names)):
-        raise SeedError("duplicate identity username")
+    if names != ["renter", "leaser", "admin"]:
+        raise SeedError("usernames must be exactly renter, leaser, admin")
     if len(IDENTITIES) != 3:
         raise SeedError("Chris split requires exactly three identities")
     kv_names = [ident.kv_secret for ident in IDENTITIES]
@@ -110,8 +110,6 @@ def catalog_invariants() -> None:
     for ident in IDENTITIES:
         if "leaser" in ident.groups or "leaser" in ident.realm_roles:
             raise SeedError("leaser is a username, not a portal role or group")
-        if ident.username == "admin" or ident.username == "KC_BOOTSTRAP_ADMIN":
-            raise SeedError("portal admin must not reuse the Keycloak bootstrap username")
 
 
 catalog_invariants()

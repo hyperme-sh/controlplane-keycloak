@@ -413,7 +413,7 @@
       "requiredActions": ["UPDATE_PASSWORD", "CONFIGURE_TOTP"]
     },
     {
-      "username": "renter@test.hyperme.sh",
+      "username": "renter",
       "enabled": true,
       "email": "renter@test.hyperme.sh",
       "emailVerified": true,
@@ -424,7 +424,7 @@
       "realmRoles": ["renter"]
     },
     {
-      "username": "leaser@test.hyperme.sh",
+      "username": "leaser",
       "enabled": true,
       "email": "leaser@test.hyperme.sh",
       "emailVerified": true,
@@ -435,7 +435,7 @@
       "realmRoles": ["host"]
     },
     {
-      "username": "admin@test.hyperme.sh",
+      "username": "admin",
       "enabled": true,
       "email": "admin@test.hyperme.sh",
       "emailVerified": true,
