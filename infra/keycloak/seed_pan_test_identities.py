@@ -9,7 +9,7 @@ Creates or updates three split users (never one user with all roles):
   not KC_BOOTSTRAP_ADMIN, not renter, not host)
 
 Passwords are read from env vars that refresh injects from Key Vault
-``kv-fyber-cg47`` (``panopticon-test-*``). Empty/missing fails closed.
+(``panopticon-test-*``). Empty/missing fails closed.
 This script never invents a password and never writes one to git.
 
 Rerun is additive-safe: no duplicate users/groups/roles, and passwords

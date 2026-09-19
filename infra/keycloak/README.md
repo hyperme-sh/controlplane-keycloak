@@ -140,13 +140,13 @@ Keycloak `--import-realm` creates the users/groups/roles on **first** start only
 python3 infra/keycloak/seed_pan_test_identities.py
 ```
 
-| Env var | Key Vault (`kv-fyber-cg47`) |
+| Env var | Key Vault secret name |
 |---------|-----------------------------|
 | `PANOPTICON_TEST_RENTER_PASSWORD` | `panopticon-test-renter-password` |
 | `PANOPTICON_TEST_LEASER_PASSWORD` | `panopticon-test-leaser-password` |
 | `PANOPTICON_TEST_PORTAL_ADMIN_PASSWORD` | `panopticon-test-portal-admin-password` |
 
-Do **not** reuse `panopticon-test-keycloak-admin-password` (`KC_BOOTSTRAP_ADMIN_PASSWORD`) or `panopticon-test-admin-password` (`ADMIN_PASSWORD`). Research applies the three values into that vault after Sign-off and wires refresh to inject the env names. The seed never generates a password into git. Rerun does not rotate passwords unless you pass `--rotate-passwords`.
+Do **not** reuse `panopticon-test-keycloak-admin-password` (`KC_BOOTSTRAP_ADMIN_PASSWORD`) or `panopticon-test-admin-password` (`ADMIN_PASSWORD`). Put the three values in Key Vault; refresh injects the env names and runs this seed. The seed never generates a password into git. Rerun does not rotate passwords unless you pass `--rotate-passwords`.
 
 Keycloak’s default browser flow already includes **Conditional OTP**: after a user enrolls TOTP (Account Console or an admin-assigned required action), they are prompted. WebAuthn is available as a required action the same way.
 
