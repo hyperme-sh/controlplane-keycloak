@@ -28,7 +28,7 @@ On first start with `--import-realm`, Keycloak loads [import/controlplane-realm.
 
 After merge, apply those URIs on the live client (existing admin path — no new seed):
 
-1. **Admin Console** — `https://auth.test.hyperme.sh/admin/` (master realm, `KC_BOOTSTRAP_ADMIN_*` / KV `panopticon-test-keycloak-admin-password`) → realm `controlplane` → Clients → `controlplane-frontend` → Valid redirect URIs + Web origins.
+1. **Admin Console** — local: `http://localhost:8081/admin/`. On pan-test: SSH or Tailscale to the VM, then `http://127.0.0.1:8081/admin/` (master realm, `KC_BOOTSTRAP_ADMIN_*` / KV `panopticon-test-keycloak-admin-password`). Public `https://auth.test.hyperme.sh/admin/` is denied at HAProxy. Then realm `controlplane` → Clients → `controlplane-frontend` → Valid redirect URIs + Web origins. See [deploy-vm.md](../../docs/deploy-vm.md#keycloak-behind-haproxy).
 2. **Admin REST / `kcadm`** — same `admin-cli` token `seed_pan_test_identities.py` already uses. GET `/admin/realms/controlplane/clients?clientId=controlplane-frontend`, then PUT the client representation with the extra URIs. The seed itself only upserts identities + the groups mapper; it does **not** patch redirects.
 
 ### OAuth2 / OIDC clients (Phase 3)
