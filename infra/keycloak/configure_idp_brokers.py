@@ -27,6 +27,7 @@ from idp_enterprise import (
     microsoft_endpoints,
     token_claim_mappers,
 )
+from test_registration import apply_test_registration
 
 REALM = "controlplane"
 FRONTEND_CLIENT_ID = "controlplane-frontend"
@@ -197,6 +198,16 @@ def ensure_token_claims(admin: AdminClient) -> None:
         )
 
 
+def open_test_registration(admin: AdminClient) -> None:
+    if _env("KC_TEST_REGISTRATION") != "1":
+        return
+    realm = admin.get("")
+    if not isinstance(realm, dict):
+        raise ConfigureError("controlplane realm is missing")
+    admin.put("", apply_test_registration(realm))
+    print("  test-plane registration open")
+
+
 def configure(admin: AdminClient) -> None:
     any_app = False
     for alias, client_env, secret_env, tenant_env in BROKERS:
@@ -211,6 +222,7 @@ def configure(admin: AdminClient) -> None:
     if not any_app:
         print("  IdP client credentials empty; brokers left unchanged")
     ensure_token_claims(admin)
+    open_test_registration(admin)
 
 
 def main() -> int:
