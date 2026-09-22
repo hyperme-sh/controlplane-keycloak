@@ -81,19 +81,38 @@ Client IDs and secrets are **not** committed. Keycloak substitutes `${ENV:defaul
 
 ### How to fill client ID / secret
 
-1. **Host env / Compose** — set the `KC_IDP_*` variables before the **first** Keycloak import (`docker compose up` with a fresh `keycloak` DB). Compose already forwards these names; later Key Vault can inject the same keys.
-2. **Keycloak Admin Console** — **Identity providers →** Microsoft Entra / GitHub / Google → paste Client ID and Client Secret (and Entra tenant ID if not `common`). Use this after the realm already exists.
-3. **Later Key Vault** — store the same `KC_IDP_*` names; do not put live secrets in git.
+One OAuth app per provider. Do not commit the client id or secret.
 
-Until real values are set, the broker buttons exist but the upstream IdP will reject the placeholder client id.
+| Env var | Key Vault (test plane) |
+|---------|------------------------|
+| `KC_IDP_MICROSOFT_CLIENT_ID` | `panopticon-test-idp-microsoft-client-id` |
+| `KC_IDP_MICROSOFT_CLIENT_SECRET` | `panopticon-test-idp-microsoft-client-secret` |
+| `KC_IDP_MICROSOFT_TENANT_ID` | `panopticon-test-idp-microsoft-tenant-id` |
+| `KC_IDP_GITHUB_CLIENT_ID` | `panopticon-test-idp-github-client-id` |
+| `KC_IDP_GITHUB_CLIENT_SECRET` | `panopticon-test-idp-github-client-secret` |
+| `KC_IDP_GOOGLE_CLIENT_ID` | `panopticon-test-idp-google-client-id` |
+| `KC_IDP_GOOGLE_CLIENT_SECRET` | `panopticon-test-idp-google-client-secret` |
+| `KC_IDP_ENTERPRISE_MAP` | `panopticon-test-idp-enterprise-map` |
+
+`refresh-test.sh` reads those names and runs `configure_idp_brokers.py` after Keycloak is up. Import is first-start only, so a realm that already exists does not see new env values until that script updates the broker. Empty client id or secret leaves that broker unchanged. Do not invent values.
+
+Leave the Microsoft tenant empty or set `common` so one app accepts a personal Microsoft account and a work account. A specific tenant id is organization-only.
+
+`KC_IDP_ENTERPRISE_MAP` is one JSON object, not a secret password. Unset leaves existing enterprise mappers alone. `{}` removes the managed ones.
+
+```json
+{"microsoft":{"<entra-tenant-id>":"<legal name>"},"google":{"<hosted-domain>":"<legal name>"},"github":{"<org-login>":"<legal name>"}}
+```
+
+A personal account stays an individual: Microsoft tenant `9188040d-6c67-4c5b-b112-36a304b66dad`, Google with no hosted domain, GitHub with no org on the profile. A mapped org key sets user attributes `enterprise` and `idp_account=organization`. An org that is not in the map stays an organization with no enterprise name. GitHub org membership is not in the default profile; the GitHub mapper fires when `idp_org` is that org login.
 
 Register **broker** redirect URIs at each IdP (not the SPA origin):
 
-| Provider | Local callback |
-|----------|----------------|
-| Microsoft Entra | `http://localhost:8081/realms/controlplane/broker/microsoft/endpoint` |
-| GitHub | `http://localhost:8081/realms/controlplane/broker/github/endpoint` |
-| Google | `http://localhost:8081/realms/controlplane/broker/google/endpoint` |
+| Provider | Local callback | Test plane |
+|----------|----------------|------------|
+| Microsoft Entra | `http://localhost:8081/realms/controlplane/broker/microsoft/endpoint` | `https://auth.test.hyperme.sh/realms/controlplane/broker/microsoft/endpoint` |
+| GitHub | `http://localhost:8081/realms/controlplane/broker/github/endpoint` | `https://auth.test.hyperme.sh/realms/controlplane/broker/github/endpoint` |
+| Google | `http://localhost:8081/realms/controlplane/broker/google/endpoint` | `https://auth.test.hyperme.sh/realms/controlplane/broker/google/endpoint` |
 
 Other providers (Facebook, X, SAML Entra) can still be added in Admin Console if needed.
 
