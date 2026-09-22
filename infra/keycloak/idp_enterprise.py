@@ -1,9 +1,8 @@
-"""Individual vs organization account classification for brokered IdPs.
+"""Individual vs organization facts copied from brokered IdPs.
 
 Microsoft, Google, and GitHub each use one OAuth app. A personal account
-stays an individual. An organization account (Entra tenant, Google hosted
-domain, GitHub org) maps to an enterprise legal name when that org key is
-in the operator map. The map is JSON from Key Vault, never a value in git.
+stays an individual. Which enterprise an organization belongs to is an
+organization-owner setting in Panopticon, not a Key Vault map.
 
 Microsoft personal accounts use the public tenant
 ``9188040d-6c67-4c5b-b112-36a304b66dad``. ``common`` on the app accepts both
@@ -21,49 +20,16 @@ PROVIDERS = ("microsoft", "google", "github")
 # Microsoft documents this tenant id for personal Microsoft accounts.
 MSA_TENANT_ID = "9188040d-6c67-4c5b-b112-36a304b66dad"
 _TENANT_RE = re.compile(r"[A-Za-z0-9-]{1,64}\Z")
-_ORG_KEY_RE = re.compile(r"[A-Za-z0-9._@-]{1,256}\Z")
 
 
 class IdpMapError(ValueError):
-    """The enterprise map or tenant id is not usable. No secret text."""
+    """The tenant id is not usable. No secret text."""
 
 
 @dataclass(frozen=True, slots=True)
 class AccountMapping:
     account: str
     org: str | None
-    enterprise: str | None
-
-
-def parse_enterprise_map(raw: str | None) -> dict[str, dict[str, str]] | None:
-    """Return None when unset. ``{}`` clears managed enterprise mappers."""
-    if raw is None or not str(raw).strip():
-        return None
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise IdpMapError("enterprise map is not JSON") from exc
-    if not isinstance(data, dict):
-        raise IdpMapError("enterprise map must be a JSON object")
-    unknown = set(data) - set(PROVIDERS)
-    if unknown:
-        raise IdpMapError("enterprise map has an unknown provider")
-    parsed: dict[str, dict[str, str]] = {}
-    for provider in PROVIDERS:
-        table = data.get(provider) or {}
-        if not isinstance(table, dict):
-            raise IdpMapError(f"{provider} enterprise map must be an object")
-        cleaned: dict[str, str] = {}
-        for key, legal_name in table.items():
-            org_key = str(key).strip()
-            name = str(legal_name).strip()
-            if not _ORG_KEY_RE.fullmatch(org_key):
-                raise IdpMapError(f"{provider} org key is not usable")
-            if not name or len(name) > 512 or any(ch in name for ch in "\r\n"):
-                raise IdpMapError(f"{provider} enterprise name is not usable")
-            cleaned[org_key] = name
-        parsed[provider] = cleaned
-    return parsed
 
 
 def microsoft_endpoints(tenant: str | None) -> dict[str, str]:
@@ -95,33 +61,25 @@ def _github_orgs(claims: dict[str, Any]) -> list[str]:
     return [single] if single else []
 
 
-def classify_idp_account(
-    provider: str,
-    claims: dict[str, Any],
-    enterprise_map: dict[str, dict[str, str]] | None,
-) -> AccountMapping:
-    """Personal stays individual. A mapped org key becomes that enterprise."""
+def classify_idp_account(provider: str, claims: dict[str, Any]) -> AccountMapping:
+    """Personal stays individual. The enterprise link is not decided here."""
     kind = provider.strip().lower()
     if kind not in PROVIDERS:
         raise IdpMapError("unknown identity provider")
-    table = (enterprise_map or {}).get(kind) or {}
     if kind == "microsoft":
         tid = _text(claims.get("tid")) or _text(claims.get("idp_org"))
         if not tid or tid.lower() == MSA_TENANT_ID:
-            return AccountMapping("individual", None, None)
-        return AccountMapping("organization", tid, table.get(tid))
+            return AccountMapping("individual", None)
+        return AccountMapping("organization", tid)
     if kind == "google":
         hosted = _text(claims.get("hd")) or _text(claims.get("idp_org"))
         if not hosted:
-            return AccountMapping("individual", None, None)
-        return AccountMapping("organization", hosted, table.get(hosted))
+            return AccountMapping("individual", None)
+        return AccountMapping("organization", hosted)
     orgs = _github_orgs(claims)
-    for org in orgs:
-        if org in table:
-            return AccountMapping("organization", org, table[org])
     if orgs:
-        return AccountMapping("organization", orgs[0], None)
-    return AccountMapping("individual", None, None)
+        return AccountMapping("organization", orgs[0])
+    return AccountMapping("individual", None)
 
 
 def _mapper(
@@ -138,19 +96,26 @@ def _mapper(
     }
 
 
-def _slug(value: str) -> str:
-    cleaned = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return (cleaned or "org")[:48]
-
-
 def claim_copy_mappers() -> list[dict[str, Any]]:
-    """Copy the org claim onto the user. Present even when the map is empty."""
+    """Copy org facts onto the user. The enterprise binding is not a mapper."""
     return [
+        _mapper(
+            "microsoft-provider",
+            "microsoft",
+            "hardcoded-attribute-idp-mapper",
+            {"attribute": "idp_provider", "attribute.value": "microsoft"},
+        ),
         _mapper(
             "microsoft-tenant",
             "microsoft",
             "oidc-user-attribute-idp-mapper",
             {"claim": "tid", "user.attribute": "idp_org"},
+        ),
+        _mapper(
+            "microsoft-directory-roles",
+            "microsoft",
+            "oidc-user-attribute-idp-mapper",
+            {"claim": "wids", "user.attribute": "idp_wids"},
         ),
         _mapper(
             "fyber-individual-microsoft",
@@ -168,10 +133,22 @@ def claim_copy_mappers() -> list[dict[str, Any]]:
             },
         ),
         _mapper(
+            "google-provider",
+            "google",
+            "hardcoded-attribute-idp-mapper",
+            {"attribute": "idp_provider", "attribute.value": "google"},
+        ),
+        _mapper(
             "google-hosted-domain",
             "google",
             "oidc-user-attribute-idp-mapper",
             {"claim": "hd", "user.attribute": "idp_org"},
+        ),
+        _mapper(
+            "github-provider",
+            "github",
+            "hardcoded-attribute-idp-mapper",
+            {"attribute": "idp_provider", "attribute.value": "github"},
         ),
         _mapper(
             "github-login",
@@ -182,64 +159,34 @@ def claim_copy_mappers() -> list[dict[str, Any]]:
     ]
 
 
-def enterprise_mappers(
-    enterprise_map: dict[str, dict[str, str]],
-) -> list[dict[str, Any]]:
-    """One mapper per org key. GitHub fires only when that org is on the profile."""
-    claim_for = {"microsoft": "tid", "google": "hd", "github": "idp_org"}
-    mapper_for = {
-        "microsoft": "oidc-advanced-attribute-idp-mapper",
-        "google": "oidc-advanced-attribute-idp-mapper",
-        "github": "oidc-advanced-attribute-idp-mapper",
-    }
-    found: list[dict[str, Any]] = []
-    for provider, table in enterprise_map.items():
-        for org_key, legal_name in sorted(table.items()):
-            found.append(
-                _mapper(
-                    f"fyber-enterprise-{provider}-{_slug(org_key)}",
-                    provider,
-                    mapper_for[provider],
-                    {
-                        "claims": json.dumps(
-                            [{"key": claim_for[provider], "value": org_key}],
-                            separators=(",", ":"),
-                        ),
-                        "attributes": json.dumps(
-                            [
-                                {"key": "enterprise", "value": legal_name},
-                                {"key": "idp_account", "value": "organization"},
-                            ],
-                            separators=(",", ":"),
-                        ),
-                    },
-                )
-            )
-    return found
-
-
 def token_claim_mappers() -> list[dict[str, Any]]:
     """Put the broker attributes on the access token. No secret material."""
     names = (
+        ("idp_provider", "idp_provider"),
         ("idp_org", "idp_org"),
         ("idp_login", "idp_login"),
         ("idp_account", "idp_account"),
-        ("enterprise", "enterprise"),
+        ("idp_wids", "idp_wids"),
     )
-    return [
-        {
-            "name": claim,
-            "protocol": "openid-connect",
-            "protocolMapper": "oidc-usermodel-attribute-mapper",
-            "consentRequired": False,
-            "config": {
-                "user.attribute": attribute,
-                "claim.name": claim,
-                "jsonType.label": "String",
-                "id.token.claim": "true",
-                "access.token.claim": "true",
-                "userinfo.token.claim": "true",
-            },
+    found = []
+    for claim, attribute in names:
+        config = {
+            "user.attribute": attribute,
+            "claim.name": claim,
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
         }
-        for claim, attribute in names
-    ]
+        if claim == "idp_wids":
+            config["multivalued"] = "true"
+        found.append(
+            {
+                "name": claim,
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usermodel-attribute-mapper",
+                "consentRequired": False,
+                "config": config,
+            }
+        )
+    return found

@@ -5,10 +5,8 @@
 the placeholder client id until this updates it. Credentials come from env
 vars that refresh injects from Key Vault. Empty values skip that provider.
 This script never invents a client id or secret and never prints one.
-
-The enterprise map (``KC_IDP_ENTERPRISE_MAP``) is JSON:
-``{"microsoft": {"<tenant-id>": "<legal name>"}, "google": {"<hd>": "..."}, "github": {"<org>": "..."}}``.
-Unset leaves existing enterprise mappers alone. ``{}`` removes the managed ones.
+Which enterprise an organization belongs to is saved by that organization's
+owner in Panopticon. This script does not apply an operator map.
 """
 
 from __future__ import annotations
@@ -26,9 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from idp_enterprise import (
     claim_copy_mappers,
-    enterprise_mappers,
     microsoft_endpoints,
-    parse_enterprise_map,
     token_claim_mappers,
 )
 
@@ -169,24 +165,6 @@ def upsert_mapper(admin: AdminClient, spec: dict[str, Any]) -> None:
     )
 
 
-def sync_enterprise_mappers(
-    admin: AdminClient,
-    enterprise_map: dict[str, dict[str, str]],
-) -> None:
-    desired = {str(item["name"]): item for item in enterprise_mappers(enterprise_map)}
-    for alias in ("microsoft", "google", "github"):
-        for current in _mappers(admin, alias):
-            name = str(current.get("name") or "")
-            if not name.startswith("fyber-enterprise-"):
-                continue
-            if name not in desired and current.get("id"):
-                admin.delete(
-                    f"/identity-provider/instances/{alias}/mappers/{current['id']}"
-                )
-    for spec in desired.values():
-        upsert_mapper(admin, spec)
-
-
 def ensure_token_claims(admin: AdminClient) -> None:
     clients = admin.get(f"/clients?clientId={FRONTEND_CLIENT_ID}") or []
     client = next(
@@ -230,11 +208,6 @@ def configure(admin: AdminClient) -> None:
         update_broker_app(admin, alias, client_id, client_secret, tenant)
     for spec in claim_copy_mappers():
         upsert_mapper(admin, spec)
-    raw_map = os.environ.get("KC_IDP_ENTERPRISE_MAP")
-    parsed = parse_enterprise_map(raw_map)
-    if parsed is not None:
-        sync_enterprise_mappers(admin, parsed)
-        print("  enterprise map applied")
     if not any_app:
         print("  IdP client credentials empty; brokers left unchanged")
     ensure_token_claims(admin)

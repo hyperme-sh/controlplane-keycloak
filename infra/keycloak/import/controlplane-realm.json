@@ -251,6 +251,26 @@
       }
     },
     {
+      "name": "microsoft-provider",
+      "identityProviderAlias": "microsoft",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "attribute": "idp_provider",
+        "attribute.value": "microsoft"
+      }
+    },
+    {
+      "name": "microsoft-directory-roles",
+      "identityProviderAlias": "microsoft",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "claim": "wids",
+        "user.attribute": "idp_wids"
+      }
+    },
+    {
       "name": "microsoft-tenant",
       "identityProviderAlias": "microsoft",
       "identityProviderMapper": "oidc-user-attribute-idp-mapper",
@@ -271,6 +291,16 @@
       }
     },
     {
+      "name": "google-provider",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "attribute": "idp_provider",
+        "attribute.value": "google"
+      }
+    },
+    {
       "name": "google-hosted-domain",
       "identityProviderAlias": "google",
       "identityProviderMapper": "oidc-user-attribute-idp-mapper",
@@ -278,6 +308,16 @@
         "syncMode": "FORCE",
         "claim": "hd",
         "user.attribute": "idp_org"
+      }
+    },
+    {
+      "name": "github-provider",
+      "identityProviderAlias": "github",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "attribute": "idp_provider",
+        "attribute.value": "github"
       }
     },
     {
@@ -417,14 +457,29 @@
           }
         },
         {
-          "name": "enterprise",
+          "name": "idp_provider",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "consentRequired": false,
           "config": {
-            "user.attribute": "enterprise",
-            "claim.name": "enterprise",
+            "user.attribute": "idp_provider",
+            "claim.name": "idp_provider",
             "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "idp_wids",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "idp_wids",
+            "claim.name": "idp_wids",
+            "jsonType.label": "String",
+            "multivalued": "true",
             "id.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true"

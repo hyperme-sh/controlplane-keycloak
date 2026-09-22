@@ -92,19 +92,14 @@ One OAuth app per provider. Do not commit the client id or secret.
 | `KC_IDP_GITHUB_CLIENT_SECRET` | `panopticon-test-idp-github-client-secret` |
 | `KC_IDP_GOOGLE_CLIENT_ID` | `panopticon-test-idp-google-client-id` |
 | `KC_IDP_GOOGLE_CLIENT_SECRET` | `panopticon-test-idp-google-client-secret` |
-| `KC_IDP_ENTERPRISE_MAP` | `panopticon-test-idp-enterprise-map` |
 
 `refresh-test.sh` reads those names and runs `configure_idp_brokers.py` after Keycloak is up. Import is first-start only, so a realm that already exists does not see new env values until that script updates the broker. Empty client id or secret leaves that broker unchanged. Do not invent values.
 
 Leave the Microsoft tenant empty or set `common` so one app accepts a personal Microsoft account and a work account. A specific tenant id is organization-only.
 
-`KC_IDP_ENTERPRISE_MAP` is one JSON object, not a secret password. Unset leaves existing enterprise mappers alone. `{}` removes the managed ones.
+The script copies `idp_provider`, the org key (`tid` or hosted domain), and Entra directory role ids (`wids`) onto the access token. It does not map an org to an enterprise. That binding is an organization-owner setting in Panopticon: the owner signs in as a Global Administrator of that tenant, with that Google hosted domain, or as a member of that GitHub org, and saves the link on the enterprise.
 
-```json
-{"microsoft":{"<entra-tenant-id>":"<legal name>"},"google":{"<hosted-domain>":"<legal name>"},"github":{"<org-login>":"<legal name>"}}
-```
-
-A personal account stays an individual: Microsoft tenant `9188040d-6c67-4c5b-b112-36a304b66dad`, Google with no hosted domain, GitHub with no org on the profile. A mapped org key sets user attributes `enterprise` and `idp_account=organization`. An org that is not in the map stays an organization with no enterprise name. GitHub org membership is not in the default profile; the GitHub mapper fires when `idp_org` is that org login.
+A personal account stays an individual: Microsoft tenant `9188040d-6c67-4c5b-b112-36a304b66dad`, Google with no hosted domain, GitHub with no org on the profile. GitHub org membership is not in the default profile.
 
 Register **broker** redirect URIs at each IdP (not the SPA origin):
 
