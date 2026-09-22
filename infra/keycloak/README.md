@@ -95,6 +95,8 @@ One OAuth app per provider. Do not commit the client id or secret.
 
 `refresh-test.sh` reads those names and runs `configure_idp_brokers.py` after Keycloak is up. Import is first-start only, so a realm that already exists does not see new env values until that script updates the broker. Empty client id or secret leaves that broker unchanged. Do not invent values.
 
+The same refresh sets `KC_TEST_REGISTRATION=1`. That opens Register on the live test realm only: email is the username, and email verification stays off because this plane has no mailer. The realm file stays `registrationAllowed: false`, and the password grant stays disabled. An account created there does not move to production and can be lost when the test database is replaced. Do not set `KC_TEST_REGISTRATION` on a production import.
+
 Leave the Microsoft tenant empty or set `common` so one app accepts a personal Microsoft account and a work account. A specific tenant id is organization-only.
 
 The script copies `idp_provider`, the org key (`tid` or hosted domain), and Entra directory role ids (`wids`) onto the access token. It does not map an org to an enterprise. That binding is an organization-owner setting in Panopticon: the owner signs in as a Global Administrator of that tenant, with that Google hosted domain, or as a member of that GitHub org, and saves the link on the enterprise.
