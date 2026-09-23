@@ -145,7 +145,7 @@ Three **split** controlplane users for the test plane. Never one user with all r
 |----------|-------|-------------------|-----|
 | `renter` | `renter@test.hyperme.sh` | Keycloak group `/renter` + realm role `renter` → `can_checkout` / `can_see_leases` / mint keys | host |
 | `leaser` | `leaser@test.hyperme.sh` | Keycloak group `/host` + realm role `host` → `can_see_host_status` (own host posture / `sell_state`) | `can_checkout`. There is **no** `leaser` role or group. |
-| `admin` | `admin@test.hyperme.sh` | New portal realm role `admin` (customer-support / user / org). Not `KC_BOOTSTRAP_ADMIN_*`. | renter, host, `can_checkout`. No refund/coupon API or screens in this seed. RoleNav still switches Renter\|Host. |
+| `admin` | `admin@test.hyperme.sh` | New portal realm role `admin` (customer-support / user / org). Not `KC_BOOTSTRAP_ADMIN_*`. After switch-tenant the tenant-session JWT also carries `operator:console`, `operator:support`, `operator:program`, and `operator:resolve`. | renter, host, `can_checkout`, `org:own`, `org:manage`. No refund/coupon API or screens in this seed. RoleNav still switches Renter\|Host. |
 
 `evaluate_portal_controls` reads those Keycloak groups (and same-named realm roles). The `admin` role is org/support admin only: invite/assign/mint/IR. It does **not** inherit renter or host grants.
 

@@ -6,7 +6,9 @@ Creates or updates three split users (never one user with all roles):
 * user ``renter`` — Keycloak group/role ``renter`` (can_checkout)
 * user ``leaser`` — Keycloak group/role ``host`` (not a leaser role)
 * user ``admin`` — Keycloak realm role ``admin`` (portal admin;
-  not KC_BOOTSTRAP_ADMIN, not renter, not host)
+  not KC_BOOTSTRAP_ADMIN, not renter, not host). The tenant-session
+  JWT after switch-tenant also carries operator:console, operator:support,
+  operator:program, and operator:resolve. Not org:own or org:manage.
 
 Passwords are read from env vars that refresh injects from Key Vault
 (``panopticon-test-*``). Empty/missing fails closed.
@@ -57,6 +59,7 @@ class Identity:
     realm_roles: tuple[str, ...]
     password_env: str
     kv_secret: str
+    operator_claims: tuple[str, ...] = ()
 
 
 IDENTITIES: tuple[Identity, ...] = (
@@ -89,6 +92,12 @@ IDENTITIES: tuple[Identity, ...] = (
         realm_roles=("admin",),
         password_env="PANOPTICON_TEST_PORTAL_ADMIN_PASSWORD",
         kv_secret="panopticon-test-portal-admin-password",
+        operator_claims=(
+            "operator:console",
+            "operator:support",
+            "operator:program",
+            "operator:resolve",
+        ),
     ),
 )
 
@@ -110,6 +119,20 @@ def catalog_invariants() -> None:
     for ident in IDENTITIES:
         if "leaser" in ident.groups or "leaser" in ident.realm_roles:
             raise SeedError("leaser is a username, not a portal role or group")
+    admin = next(ident for ident in IDENTITIES if ident.username == "admin")
+    expected_operator = (
+        "operator:console",
+        "operator:support",
+        "operator:program",
+        "operator:resolve",
+    )
+    if admin.operator_claims != expected_operator:
+        raise SeedError("pan-test admin must hold the four operator claims")
+    if "org:own" in admin.operator_claims or "org:manage" in admin.operator_claims:
+        raise SeedError("pan-test admin is not an org owner")
+    for ident in IDENTITIES:
+        if ident.username != "admin" and ident.operator_claims:
+            raise SeedError("only the pan-test admin seed carries operator claims")
 
 
 catalog_invariants()
