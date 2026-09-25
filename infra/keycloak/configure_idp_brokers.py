@@ -7,6 +7,9 @@ vars that refresh injects from Key Vault. Empty values skip that provider.
 This script never invents a client id or secret and never prints one.
 Which enterprise an organization belongs to is saved by that organization's
 owner in Panopticon. This script does not apply an operator map.
+
+The same run upserts the public client ``hypermesh-native`` from the realm
+file. Re-run updates that client in place and does not create a second one.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from hypermesh_native import NativeClientError, ensure_hypermesh_native
 from idp_enterprise import (
     claim_copy_mappers,
     microsoft_endpoints,
@@ -223,6 +227,10 @@ def configure(admin: AdminClient) -> None:
         print("  IdP client credentials empty; brokers left unchanged")
     ensure_token_claims(admin)
     open_test_registration(admin)
+    try:
+        ensure_hypermesh_native(admin)
+    except NativeClientError as exc:
+        raise ConfigureError(str(exc)) from None
 
 
 def main() -> int:

@@ -38,10 +38,13 @@ After merge, apply those URIs on the live client (existing admin path — no new
 | `controlplane-frontend` | Authorization Code + **PKCE** | Next.js / Vite web console |
 | `controlplane-mobile` | Authorization Code + **PKCE** | Expo / React Native; adjust `redirectUris` for your app scheme |
 | `controlplane-device` | **Device Authorization Grant** | CLI, embedded; enable in client **Advanced** if import omits it |
+| `hypermesh-native` | Authorization Code + **PKCE S256** and **Device Authorization Grant** | Visor and CLI. Public, no secret. Redirect `http://127.0.0.1/callback` (no port). `offline_access` is not a default or optional scope. Access tokens use the realm lifespan (300s). |
 | `controlplane-m2m` | **Client Credentials** | Confidential; default secret `dev-m2m-client-secret-change-me` — **rotate in prod** |
 | `controlplane-api-key` | (placeholder) | `azp` for gateway-minted HS256 tokens; not a Keycloak login client |
 
 JWT validation in the API allows any `azp` in `KEYCLOAK_ALLOWED_CLIENT_IDS` (see `docker-compose.yaml`). API keys are validated separately via [api-keys-service](../../core/api-keys-service/) and exchanged for short-lived HS256 tokens (`API_KEY_EXCHANGE_JWT_SECRET`).
+
+`hypermesh-native` is declared in [import/controlplane-realm.json](import/controlplane-realm.json). `--import-realm` loads that file on first Keycloak start and skips a realm that already exists. [configure_idp_brokers.py](configure_idp_brokers.py) upserts this client on a live realm: one row for `clientId=hypermesh-native`, the same internal id on re-run, no client secret. FyberLabs/infra `terraform/panopticon-test/files/refresh-test.sh` runs that script after compose up, which is the deploy that applies it at `https://auth.test.hyperme.sh`. Do not create the client in the admin console. API `azp` checks always include `hypermesh-native`, including when that refresh script's `KEYCLOAK_ALLOWED_CLIENT_IDS` line was written before this client.
 
 ### Bootstrap user (OIDC / IdP, not a standing password)
 
