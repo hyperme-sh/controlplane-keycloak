@@ -8,10 +8,11 @@ This script never invents a client id or secret and never prints one.
 Which enterprise an organization belongs to is saved by that organization's
 owner in Panopticon. This script does not apply an operator map.
 
-The same process upserts the public client ``hypermesh-native`` from the
-realm file, in its own step, before the broker update. A failure of that
-step is reported on its own and still lets the broker step run. Re-run
-updates that client in place and does not create a second one.
+The same process upserts the public clients ``hypermesh-native`` and
+``s3rch-web`` from the realm file, each in its own step, before the broker
+update. A failure of one client step is reported on its own and still lets
+the other steps run. Re-run updates each client in place and does not create
+a second one. ``s3rch-web`` does not add an identity provider.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from hypermesh_native import NativeClientError, ensure_hypermesh_native
+from s3rch_web import S3rchClientError, ensure_s3rch_web
 from idp_enterprise import (
     claim_copy_mappers,
     microsoft_endpoints,
@@ -232,12 +234,12 @@ def configure(admin: AdminClient) -> None:
 
 
 def apply_realm_updates(admin: AdminClient) -> int:
-    """Native client first, then brokers. Each failure is its own error.
+    """Native client, then s3r.ch client, then brokers. Each failure is its own error.
 
     The test refresh treats a non-zero exit from this process as one
-    non-fatal warning. The native-client line is printed on its own so that
-    warning is not the only record of a visor-client failure. A network
-    error on that step is the same line, and the broker step still runs.
+    non-fatal warning. Each client line is printed on its own so that
+    warning is not the only record of a failure. A network error on one
+    client step is the same line, and the later steps still run.
     """
     failed = False
     try:
@@ -246,6 +248,14 @@ def apply_realm_updates(admin: AdminClient) -> int:
         failed = True
         print(
             f"ERROR: hypermesh-native client was not applied: {exc}",
+            file=sys.stderr,
+        )
+    try:
+        ensure_s3rch_web(admin)
+    except (S3rchClientError, ConfigureError, urllib.error.URLError) as exc:
+        failed = True
+        print(
+            f"ERROR: s3rch-web client was not applied: {exc}",
             file=sys.stderr,
         )
     try:

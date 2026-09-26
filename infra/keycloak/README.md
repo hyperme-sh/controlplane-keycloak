@@ -39,6 +39,7 @@ After merge, apply those URIs on the live client (existing admin path — no new
 | `controlplane-mobile` | Authorization Code + **PKCE** | Expo / React Native; adjust `redirectUris` for your app scheme |
 | `controlplane-device` | **Device Authorization Grant** | CLI, embedded; enable in client **Advanced** if import omits it |
 | `hypermesh-native` | Authorization Code + **PKCE S256** and **Device Authorization Grant** | Visor and CLI. Public, no secret. Redirect `http://127.0.0.1/callback` (no port). Session idle 30 min, max 10 h, device code 600 s. |
+| `s3rch-web` | Authorization Code + **PKCE S256** | s3r.ch backup door. Public, no secret. Same realm brokers (`microsoft`, `github`, `google`). Redirects are the exact `/api/identity/oauth/callback` URIs on `https://s3r.ch`, `https://www.s3r.ch`, and local Next on port 3000. Not in `KEYCLOAK_ALLOWED_CLIENT_IDS`. |
 | `controlplane-m2m` | **Client Credentials** | Confidential; default secret `dev-m2m-client-secret-change-me` — **rotate in prod** |
 | `controlplane-api-key` | (placeholder) | `azp` for gateway-minted HS256 tokens; not a Keycloak login client |
 
@@ -49,6 +50,8 @@ JWT validation in the API allows any `azp` in `KEYCLOAK_ALLOWED_CLIENT_IDS` (see
 The visor and CLI request scope `openid` only. Default client scopes `basic`, `roles`, `email`, `profile`, and `acr` are the accepted meaning of that request. `web-origins`, `address`, `phone`, and `microprofile-jwt` are not assigned. `offline_access` is not assigned. Access tokens stay on the realm lifespan (300s). Client session caps are 30 minutes idle and 10 hours max. Device codes last 600 seconds. Offline session attributes are cleared on each run.
 
 `KEYCLOAK_ALLOWED_CLIENT_IDS` defaults include `hypermesh-native` (Compose and `Settings`). The full revocation path is in [docs/oidc-console.md](../../docs/oidc-console.md): remove the id and recreate the services that read it. Already-issued tenant sessions last up to 900 seconds. To stop Keycloak issuing tokens, set `enabled` to false in the realm file. A console disable is put back on the next refresh. Application code does not put the id back.
+
+`s3rch-web` is declared in the same realm file and upserted by the same script, in its own step after `hypermesh-native` and before the broker update. One row for `clientId=s3rch-web`, the same internal id on re-run, no client secret. Redirect URIs are exact callback paths (no wildcard). Protocol mappers are only `idp_enterprise.token_claim_mappers()`. A failure of this step is printed on its own as `s3rch-web client was not applied` and does not stop the native client or the brokers. Do not create a second IdP or a Microsoft / GitHub / Google app for s3r.ch. Do not add `s3rch-web` to `KEYCLOAK_ALLOWED_CLIENT_IDS`: the backup session is an s3r.ch cookie, not a control-plane access token.
 
 ### Bootstrap user (OIDC / IdP, not a standing password)
 
