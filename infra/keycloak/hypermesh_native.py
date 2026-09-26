@@ -12,9 +12,17 @@ client, and does not mint a secret.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+
+# Loaded by path from tests and from configure_idp_brokers.py.
+_KEYCLOAK_DIR = str(Path(__file__).resolve().parent)
+if _KEYCLOAK_DIR not in sys.path:
+    sys.path.insert(0, _KEYCLOAK_DIR)
+
+from idp_enterprise import token_claim_mappers
 
 CLIENT_ID = "hypermesh-native"
 REDIRECT_URI = "http://127.0.0.1/callback"
@@ -52,13 +60,7 @@ CLEARED_ATTRIBUTES = (
     "access.token.lifespan",
 )
 
-IDP_MAPPER_NAMES = (
-    "idp_org",
-    "idp_login",
-    "idp_account",
-    "idp_provider",
-    "idp_wids",
-)
+FRONTEND_CLIENT_ID = "controlplane-frontend"
 
 
 class NativeClientError(RuntimeError):
@@ -77,7 +79,36 @@ def declared_client(realm: dict[str, Any] | None = None) -> dict[str, Any]:
     return matches[0]
 
 
-def validate_declared_client(client: dict[str, Any]) -> None:
+def portal_groups_mapper(realm: dict[str, Any]) -> dict[str, Any]:
+    """The frontend ``groups`` claim mapper. CLI switch-tenant uses the same one."""
+    matches = [
+        item
+        for item in realm.get("clients") or []
+        if isinstance(item, dict) and item.get("clientId") == FRONTEND_CLIENT_ID
+    ]
+    if len(matches) != 1:
+        raise NativeClientError(f"{FRONTEND_CLIENT_ID} must appear once in the realm import")
+    groups = [
+        item
+        for item in matches[0].get("protocolMappers") or []
+        if isinstance(item, dict) and item.get("name") == "groups"
+    ]
+    if len(groups) != 1:
+        raise NativeClientError(f"{FRONTEND_CLIENT_ID} groups mapper must appear once")
+    return json.loads(json.dumps(groups[0]))
+
+
+def declared_protocol_mappers(realm: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Groups from the frontend client, then ``idp_*`` from ``token_claim_mappers``.
+
+    The live frontend client is updated from that same function. The realm
+    file must list the identical mappers so first import and refresh agree.
+    """
+    realm = load_realm() if realm is None else realm
+    return [portal_groups_mapper(realm), *token_claim_mappers()]
+
+
+def validate_declared_client(client: dict[str, Any], realm: dict[str, Any] | None = None) -> None:
     """Fail closed if the realm file drifts from the visor contract."""
     if client.get("clientId") != CLIENT_ID:
         raise NativeClientError(f"clientId must be {CLIENT_ID}")
@@ -116,10 +147,12 @@ def validate_declared_client(client: dict[str, Any]) -> None:
         raise NativeClientError(f"{CLIENT_ID} default client scopes drifted")
     if list(OPTIONAL_CLIENT_SCOPES) != optional_scopes:
         raise NativeClientError(f"{CLIENT_ID} optional client scopes drifted")
-    mappers = client.get("protocolMappers") or []
-    names = [item.get("name") for item in mappers]
-    if names != list(IDP_MAPPER_NAMES):
-        raise NativeClientError(f"{CLIENT_ID} protocol mappers must be the portal idp_* claims")
+    expected = declared_protocol_mappers(realm)
+    if client.get("protocolMappers") != expected:
+        raise NativeClientError(
+            f"{CLIENT_ID} protocol mappers must be the portal groups mapper "
+            "plus idp_enterprise.token_claim_mappers()"
+        )
 
 
 def upsert_payload(declared: dict[str, Any], existing: dict[str, Any] | None) -> dict[str, Any]:
@@ -219,8 +252,9 @@ def _sync_scope_bucket(
 
 def ensure_hypermesh_native(admin: Any, realm: dict[str, Any] | None = None) -> None:
     """Create or update the one native client. Does not touch other clients."""
-    declared = declared_client(realm)
-    validate_declared_client(declared)
+    source = load_realm() if realm is None else realm
+    declared = declared_client(source)
+    validate_declared_client(declared, source)
     existing = _find_client(admin)
     payload = upsert_payload(declared, existing)
     if existing is None:
@@ -257,7 +291,7 @@ def ensure_hypermesh_native(admin: Any, realm: dict[str, Any] | None = None) -> 
     _sync_protocol_mappers(
         admin,
         client_uuid,
-        list(declared.get("protocolMappers") or []),
+        declared_protocol_mappers(source),
     )
 
 

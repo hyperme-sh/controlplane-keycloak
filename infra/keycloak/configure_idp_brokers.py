@@ -236,12 +236,13 @@ def apply_realm_updates(admin: AdminClient) -> int:
 
     The test refresh treats a non-zero exit from this process as one
     non-fatal warning. The native-client line is printed on its own so that
-    warning is not the only record of a visor-client failure.
+    warning is not the only record of a visor-client failure. A network
+    error on that step is the same line, and the broker step still runs.
     """
     failed = False
     try:
         ensure_hypermesh_native(admin)
-    except (NativeClientError, ConfigureError) as exc:
+    except (NativeClientError, ConfigureError, urllib.error.URLError) as exc:
         failed = True
         print(
             f"ERROR: hypermesh-native client was not applied: {exc}",
