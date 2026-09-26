@@ -20,20 +20,44 @@ CLIENT_ID = "hypermesh-native"
 REDIRECT_URI = "http://127.0.0.1/callback"
 REALM_PATH = Path(__file__).resolve().parent / "import" / "controlplane-realm.json"
 
-# Realm built-ins minus offline_access. Access tokens stay on the realm
-# lifespan (accessTokenLifespan, 300s). Do not set access.token.lifespan.
+# What "openid only" means for this client. The visor requests scope openid.
+# These defaults are always issued. Optional scopes are empty.
 DEFAULT_CLIENT_SCOPES = (
-    "web-origins",
-    "acr",
-    "profile",
+    "basic",
     "roles",
     "email",
-    "basic",
+    "profile",
+    "acr",
 )
-OPTIONAL_CLIENT_SCOPES = (
-    "address",
-    "phone",
-    "microprofile-jwt",
+OPTIONAL_CLIENT_SCOPES: tuple[str, ...] = ()
+
+# 30 min idle, 10 h max, device code 600 s. Strings, as Keycloak stores them.
+SESSION_IDLE_TIMEOUT = "1800"
+SESSION_MAX_LIFESPAN = "36000"
+DEVICE_CODE_LIFESPAN = "600"
+
+DECLARED_ATTRIBUTES = {
+    "pkce.code.challenge.method": "S256",
+    "oauth2.device.authorization.grant.enabled": "true",
+    "client.session.idle.timeout": SESSION_IDLE_TIMEOUT,
+    "client.session.max.lifespan": SESSION_MAX_LIFESPAN,
+    "oauth2.device.code.lifespan": DEVICE_CODE_LIFESPAN,
+}
+
+# Hand-edited values here would outlive the SSO session caps. Every run
+# sends null so Keycloak drops them. Access tokens stay on the realm default.
+CLEARED_ATTRIBUTES = (
+    "client.offline.session.idle.timeout",
+    "client.offline.session.max.lifespan",
+    "access.token.lifespan",
+)
+
+IDP_MAPPER_NAMES = (
+    "idp_org",
+    "idp_login",
+    "idp_account",
+    "idp_provider",
+    "idp_wids",
 )
 
 
@@ -70,10 +94,8 @@ def validate_declared_client(client: dict[str, Any]) -> None:
     if client.get("serviceAccountsEnabled") is not False:
         raise NativeClientError(f"{CLIENT_ID} must not enable a service account")
     attrs = client.get("attributes") or {}
-    if attrs.get("pkce.code.challenge.method") != "S256":
-        raise NativeClientError(f"{CLIENT_ID} must require PKCE S256")
-    if attrs.get("oauth2.device.authorization.grant.enabled") != "true":
-        raise NativeClientError(f"{CLIENT_ID} must enable the device authorization grant")
+    if attrs != DECLARED_ATTRIBUTES:
+        raise NativeClientError(f"{CLIENT_ID} attributes must be the declared set")
     if attrs.get("access.token.lifespan"):
         raise NativeClientError(f"{CLIENT_ID} must use the realm access-token lifespan")
     redirects = client.get("redirectUris") or []
@@ -94,45 +116,55 @@ def validate_declared_client(client: dict[str, Any]) -> None:
         raise NativeClientError(f"{CLIENT_ID} default client scopes drifted")
     if list(OPTIONAL_CLIENT_SCOPES) != optional_scopes:
         raise NativeClientError(f"{CLIENT_ID} optional client scopes drifted")
+    mappers = client.get("protocolMappers") or []
+    names = [item.get("name") for item in mappers]
+    if names != list(IDP_MAPPER_NAMES):
+        raise NativeClientError(f"{CLIENT_ID} protocol mappers must be the portal idp_* claims")
 
 
 def upsert_payload(declared: dict[str, Any], existing: dict[str, Any] | None) -> dict[str, Any]:
     """Representation for create or update. Preserves the Keycloak id.
 
-    An empty ``access.token.lifespan`` clears a client override so the realm
-    default applies. No secret is copied forward.
+    Attributes are the declared set, not a merge. Keys that exist only on the
+    live client are set to null so a hand edit cannot keep a longer session.
+    Offline session attributes and ``access.token.lifespan`` are cleared on
+    every run. No secret is copied forward.
     """
     payload = json.loads(json.dumps(declared))
     payload.pop("secret", None)
     payload.pop("id", None)
     attrs = dict(payload.get("attributes") or {})
-    had_lifespan_override = False
     if existing:
         if not existing.get("id"):
             raise NativeClientError(f"{CLIENT_ID} update is missing the Keycloak id")
         payload["id"] = existing["id"]
-        merged = dict(existing.get("attributes") or {})
-        had_lifespan_override = bool(str(merged.get("access.token.lifespan") or "").strip())
-        merged.update(attrs)
-        attrs = merged
-    # Empty string clears a client override. A new client omits the attribute
-    # and inherits the realm access-token lifespan.
-    if had_lifespan_override:
-        attrs["access.token.lifespan"] = ""
-    else:
-        attrs.pop("access.token.lifespan", None)
+        for key in existing.get("attributes") or {}:
+            if key not in attrs:
+                attrs[key] = None
+    for key in CLEARED_ATTRIBUTES:
+        attrs[key] = None
     payload["attributes"] = attrs
     payload["publicClient"] = True
+    payload["standardFlowEnabled"] = True
+    payload["implicitFlowEnabled"] = False
+    payload["directAccessGrantsEnabled"] = False
+    payload["serviceAccountsEnabled"] = False
     payload["redirectUris"] = [REDIRECT_URI]
     payload["webOrigins"] = []
+    payload["defaultClientScopes"] = list(DEFAULT_CLIENT_SCOPES)
+    payload["optionalClientScopes"] = list(OPTIONAL_CLIENT_SCOPES)
     return payload
 
 
-def scope_ids_named(assigned: list[dict[str, Any]], name: str) -> list[str]:
+def undeclared_scope_ids(
+    assigned: list[dict[str, Any]],
+    desired_names: tuple[str, ...] | list[str],
+) -> list[str]:
+    desired = set(desired_names)
     return [
         str(item["id"])
         for item in assigned
-        if isinstance(item, dict) and item.get("name") == name and item.get("id")
+        if isinstance(item, dict) and item.get("id") and item.get("name") not in desired
     ]
 
 
@@ -179,7 +211,7 @@ def _sync_scope_bucket(
     catalog_by_name: dict[str, str],
 ) -> None:
     assigned = _as_dicts(admin.get(f"/clients/{client_uuid}/{bucket}"))
-    for scope_id in scope_ids_named(assigned, "offline_access"):
+    for scope_id in undeclared_scope_ids(assigned, desired):
         admin.delete(f"/clients/{client_uuid}/{bucket}/{scope_id}")
     for scope_id in missing_scope_ids(assigned, desired, catalog_by_name):
         admin.put(f"/clients/{client_uuid}/{bucket}/{scope_id}", None)
@@ -222,3 +254,55 @@ def ensure_hypermesh_native(admin: Any, realm: dict[str, Any] | None = None) -> 
         desired=list(declared.get("optionalClientScopes") or []),
         catalog_by_name=catalog,
     )
+    _sync_protocol_mappers(
+        admin,
+        client_uuid,
+        list(declared.get("protocolMappers") or []),
+    )
+
+
+def _mapper_identity(spec: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        spec.get("protocol"),
+        spec.get("protocolMapper"),
+        spec.get("consentRequired"),
+        json.dumps(spec.get("config") or {}, sort_keys=True),
+    )
+
+
+def _sync_protocol_mappers(
+    admin: Any,
+    client_uuid: str,
+    declared_mappers: list[dict[str, Any]],
+) -> None:
+    """Declared mappers only. A name that is not declared is deleted."""
+    current = _as_dicts(admin.get(f"/clients/{client_uuid}/protocol-mappers/models"))
+    declared_by_name = {
+        str(item["name"]): item
+        for item in declared_mappers
+        if item.get("name")
+    }
+    kept: dict[str, dict[str, Any]] = {}
+    for item in current:
+        name = str(item.get("name") or "")
+        mapper_id = item.get("id")
+        if not mapper_id or name not in declared_by_name or name in kept:
+            if mapper_id:
+                admin.delete(
+                    f"/clients/{client_uuid}/protocol-mappers/models/{mapper_id}"
+                )
+            continue
+        kept[name] = item
+    for name, spec in declared_by_name.items():
+        existing = kept.get(name)
+        if existing is None:
+            admin.post(f"/clients/{client_uuid}/protocol-mappers/models", spec)
+            continue
+        if _mapper_identity(existing) == _mapper_identity(spec):
+            continue
+        updated = dict(spec)
+        updated["id"] = existing["id"]
+        admin.put(
+            f"/clients/{client_uuid}/protocol-mappers/models/{existing['id']}",
+            updated,
+        )

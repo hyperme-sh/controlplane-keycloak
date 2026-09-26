@@ -38,13 +38,17 @@ After merge, apply those URIs on the live client (existing admin path — no new
 | `controlplane-frontend` | Authorization Code + **PKCE** | Next.js / Vite web console |
 | `controlplane-mobile` | Authorization Code + **PKCE** | Expo / React Native; adjust `redirectUris` for your app scheme |
 | `controlplane-device` | **Device Authorization Grant** | CLI, embedded; enable in client **Advanced** if import omits it |
-| `hypermesh-native` | Authorization Code + **PKCE S256** and **Device Authorization Grant** | Visor and CLI. Public, no secret. Redirect `http://127.0.0.1/callback` (no port). `offline_access` is not a default or optional scope. Access tokens use the realm lifespan (300s). |
+| `hypermesh-native` | Authorization Code + **PKCE S256** and **Device Authorization Grant** | Visor and CLI. Public, no secret. Redirect `http://127.0.0.1/callback` (no port). Session idle 30 min, max 10 h, device code 600 s. |
 | `controlplane-m2m` | **Client Credentials** | Confidential; default secret `dev-m2m-client-secret-change-me` — **rotate in prod** |
 | `controlplane-api-key` | (placeholder) | `azp` for gateway-minted HS256 tokens; not a Keycloak login client |
 
 JWT validation in the API allows any `azp` in `KEYCLOAK_ALLOWED_CLIENT_IDS` (see `docker-compose.yaml`). API keys are validated separately via [api-keys-service](../../core/api-keys-service/) and exchanged for short-lived HS256 tokens (`API_KEY_EXCHANGE_JWT_SECRET`).
 
-`hypermesh-native` is declared in [import/controlplane-realm.json](import/controlplane-realm.json). `--import-realm` loads that file on first Keycloak start and skips a realm that already exists. [configure_idp_brokers.py](configure_idp_brokers.py) upserts this client on a live realm: one row for `clientId=hypermesh-native`, the same internal id on re-run, no client secret. FyberLabs/infra `terraform/panopticon-test/files/refresh-test.sh` runs that script after compose up, which is the deploy that applies it at `https://auth.test.hyperme.sh`. Do not create the client in the admin console. API `azp` checks always include `hypermesh-native`, including when that refresh script's `KEYCLOAK_ALLOWED_CLIENT_IDS` line was written before this client.
+`hypermesh-native` is declared in [import/controlplane-realm.json](import/controlplane-realm.json). `--import-realm` loads that file on first Keycloak start and skips a realm that already exists. [configure_idp_brokers.py](configure_idp_brokers.py) upserts this client on a live realm before the IdP broker step: one row for `clientId=hypermesh-native`, the same internal id on re-run, no client secret. Attributes, client scopes, and protocol mappers are replaced from that declaration, so a hand edit does not keep a longer session, an extra scope, or a stray mapper. A failure of this step is printed on its own as `hypermesh-native client was not applied` and does not depend on the broker step. FyberLabs/infra `terraform/panopticon-test/files/refresh-test.sh` runs that script after compose up, which is the deploy that applies it at `https://auth.test.hyperme.sh`. Do not create the client in the admin console.
+
+The visor and CLI request scope `openid` only. Default client scopes `basic`, `roles`, `email`, `profile`, and `acr` are the accepted meaning of that request. `web-origins`, `address`, `phone`, and `microprofile-jwt` are not assigned. `offline_access` is not assigned. Access tokens stay on the realm lifespan (300s). Client session caps are 30 minutes idle and 10 hours max. Device codes last 600 seconds. Offline session attributes are cleared on each run.
+
+`KEYCLOAK_ALLOWED_CLIENT_IDS` defaults include `hypermesh-native` (Compose and `Settings`). Set that variable without this id to revoke API acceptance of the visor token. Application code does not put the id back.
 
 ### Bootstrap user (OIDC / IdP, not a standing password)
 

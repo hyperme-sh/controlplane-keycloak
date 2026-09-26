@@ -572,22 +572,93 @@
       ],
       "webOrigins": [],
       "defaultClientScopes": [
-        "web-origins",
-        "acr",
-        "profile",
+        "basic",
         "roles",
         "email",
-        "basic"
+        "profile",
+        "acr"
       ],
-      "optionalClientScopes": [
-        "address",
-        "phone",
-        "microprofile-jwt"
-      ],
+      "optionalClientScopes": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "oauth2.device.authorization.grant.enabled": "true"
-      }
+        "oauth2.device.authorization.grant.enabled": "true",
+        "client.session.idle.timeout": "1800",
+        "client.session.max.lifespan": "36000",
+        "oauth2.device.code.lifespan": "600"
+      },
+      "protocolMappers": [
+        {
+          "name": "idp_org",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "idp_org",
+            "claim.name": "idp_org",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "idp_login",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "idp_login",
+            "claim.name": "idp_login",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "idp_account",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "idp_account",
+            "claim.name": "idp_account",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "idp_provider",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "idp_provider",
+            "claim.name": "idp_provider",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "idp_wids",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "idp_wids",
+            "claim.name": "idp_wids",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [

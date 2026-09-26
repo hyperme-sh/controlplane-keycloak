@@ -8,8 +8,10 @@ This script never invents a client id or secret and never prints one.
 Which enterprise an organization belongs to is saved by that organization's
 owner in Panopticon. This script does not apply an operator map.
 
-The same run upserts the public client ``hypermesh-native`` from the realm
-file. Re-run updates that client in place and does not create a second one.
+The same process upserts the public client ``hypermesh-native`` from the
+realm file, in its own step, before the broker update. A failure of that
+step is reported on its own and still lets the broker step run. Re-run
+updates that client in place and does not create a second one.
 """
 
 from __future__ import annotations
@@ -227,10 +229,30 @@ def configure(admin: AdminClient) -> None:
         print("  IdP client credentials empty; brokers left unchanged")
     ensure_token_claims(admin)
     open_test_registration(admin)
+
+
+def apply_realm_updates(admin: AdminClient) -> int:
+    """Native client first, then brokers. Each failure is its own error.
+
+    The test refresh treats a non-zero exit from this process as one
+    non-fatal warning. The native-client line is printed on its own so that
+    warning is not the only record of a visor-client failure.
+    """
+    failed = False
     try:
         ensure_hypermesh_native(admin)
-    except NativeClientError as exc:
-        raise ConfigureError(str(exc)) from None
+    except (NativeClientError, ConfigureError) as exc:
+        failed = True
+        print(
+            f"ERROR: hypermesh-native client was not applied: {exc}",
+            file=sys.stderr,
+        )
+    try:
+        configure(admin)
+    except ConfigureError as exc:
+        failed = True
+        print(f"ERROR: IdP broker configure failed: {exc}", file=sys.stderr)
+    return 1 if failed else 0
 
 
 def main() -> int:
@@ -240,8 +262,7 @@ def main() -> int:
     if not username or not password:
         raise ConfigureError("missing KC_BOOTSTRAP_ADMIN_USERNAME or password")
     token = admin_token(base, username, password)
-    configure(AdminClient(base, token))
-    return 0
+    return apply_realm_updates(AdminClient(base, token))
 
 
 if __name__ == "__main__":
