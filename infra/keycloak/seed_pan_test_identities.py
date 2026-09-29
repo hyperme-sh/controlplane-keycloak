@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -428,6 +429,26 @@ def seed(
     return actions
 
 
+def wait_until_ready(base_url: str, seconds: float) -> None:
+    """Bounded, credential-free readiness probe for deployment callers."""
+    deadline = time.monotonic() + seconds
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SeedError("Keycloak readiness timed out")
+        try:
+            with urllib.request.urlopen(
+                base_url.rstrip("/") + "/realms/master", timeout=min(2.0, remaining)
+            ) as response:
+                if response.status == 200:
+                    return
+        except (OSError, urllib.error.URLError):
+            pass
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(2.0, remaining))
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -435,7 +456,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Reset the three user passwords from env. Default is leave existing passwords.",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--wait-seconds", type=int, default=0,
+        help="Wait up to this many seconds for Keycloak before seeding (0: no wait).",
+    )
+    args = parser.parse_args(argv)
+    if args.wait_seconds < 0:
+        parser.error("--wait-seconds must be non-negative")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -447,6 +475,8 @@ def main(argv: list[str] | None = None) -> int:
         base_url = os.environ.get("KEYCLOAK_URL", "http://127.0.0.1:8081").strip()
         if not base_url:
             raise SeedError("missing or empty KEYCLOAK_URL")
+        if args.wait_seconds:
+            wait_until_ready(base_url, args.wait_seconds)
         actions = seed(
             base_url=base_url,
             bootstrap_username=bootstrap_user,
