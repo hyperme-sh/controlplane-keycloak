@@ -163,8 +163,23 @@ Keycloak `--import-realm` creates the users/groups/roles on **first** start only
 
 ```bash
 # Env vars must already be present (refresh injects from KV). Empty fails closed.
-python3 infra/keycloak/seed_pan_test_identities.py
+./scripts/seed-pan-test-identities.sh
 ```
+
+The deployment entrypoint validates all required credentials before making any
+request, waits up to 60 seconds for `/realms/master`, then calls the existing
+seed once. `KEYCLOAK_URL` defaults to loopback `http://127.0.0.1:8081`.
+A missing credential, readiness timeout, or seed error returns nonzero. It does
+not source `.env`; the caller must inject the vault values into the process
+environment, including `KC_BOOTSTRAP_ADMIN_USERNAME` and
+`KC_BOOTSTRAP_ADMIN_PASSWORD`. Do not put credentials in command arguments.
+`--wait-seconds N` overrides the readiness budget; the raw Python seed retains
+its no-wait default. Existing passwords change only with `--rotate-passwords`.
+
+For #210, infra can replace its readiness/invocation block with this entrypoint
+after the new revision is live and verified on pan-test. Keep vault passthrough.
+No replacement password generation, production invocation, or infra removal is
+part of this change.
 
 | Env var | Key Vault secret name |
 |---------|-----------------------------|
