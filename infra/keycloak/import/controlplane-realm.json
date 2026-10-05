@@ -367,6 +367,47 @@
   ],
   "clients": [
     {
+      "clientId": "hypermesh-host-setup",
+      "name": "Hypermesh host setup",
+      "description": "Sign in to connect a host. Approve the host separately in your dashboard.",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "consentRequired": true,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "oauth2.device.authorization.grant.enabled": "true",
+        "client.session.idle.timeout": "1800",
+        "client.session.max.lifespan": "36000",
+        "oauth2.device.code.lifespan": "600"
+      },
+      "protocolMappers": [
+        {
+          "name": "host-setup-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hypermesh-host-setup",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "controlplane-frontend",
       "name": "SPA (Vite / Next.js)",
       "enabled": true,
