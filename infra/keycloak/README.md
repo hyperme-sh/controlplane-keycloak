@@ -59,15 +59,24 @@ The visor and CLI request scope `openid` only. Default client scopes `basic`, `r
 It is a public device-only client with S256 PKCE, default scopes `basic` and
 `email`, and no optional scopes. Profile, roles, groups, enterprise IdP claims,
 redirect-based login and offline access are excluded. Its explicit audience
-mapper lets APIs validate the token without depending on the roles scope.
+mapper lets the dedicated setup endpoints validate the device token.
 Subject and email identify the existing account; tenant membership and host
 organization authority are checked against the database. Scope reduction does
 not replace those authorization checks.
 
 The realm import and `configure_idp_brokers.py` apply the same declaration.
 Live refresh removes extra scopes and mappers, and reports host-client failures
-separately. Compose and the backend default allowlist include the new client;
-installations overriding `KEYCLOAK_ALLOWED_CLIENT_IDS` must add it explicitly.
+separately. The client stays outside `KEYCLOAK_ALLOWED_CLIENT_IDS`. Generic JWT
+validation rejects it even if an old deployment override includes it. The
+installer calls only `/auth/host-setup/me`, `/auth/host-setup/enrollment/grant`
+(host membership only), and `/auth/host-setup/session`. The last endpoint checks
+membership and bans, then issues a 15-minute session with a dedicated issuer,
+audience and `host_setup` purpose, containing subject, email and tenant only.
+It never copies account roles, groups or permissions. Generic tenant-session
+validation rejects this session and legacy generic sessions bearing this client
+ID. Only registration and certification owner-approval APIs decode it; tenant
+headers remain cross-checks. To stop new setup logins, disable the client in
+Keycloak's declared configuration; issued sessions expire after 15 minutes.
 Deploy this backend/realm change before releasing the installer client change.
 
 Registration and certification owner approval accept the dedicated client and
