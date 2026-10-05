@@ -233,3 +233,13 @@ To **require** MFA for everyone later: set **Configure OTP** (or WebAuthn) as a 
 - `VITE_KEYCLOAK_CLIENT_ID` = `controlplane-frontend`
 
 See [frontend OIDC contract](../docs/oidc-console.md) for redirect URIs and client settings shared with Next.js.
+
+
+The public installer entrypoints are `/auth/host-setup/*` (without `/api/v1`).
+Gateway authentication validates the device token only for GET `me`, POST
+`enrollment/grant`, and POST `session`. It validates the purpose-bound session
+only for registration create/read/complete and certification owner approval or
+resume. These paths remain authenticated, with exact method/path matching and
+tenant cross-checks; backend ownership checks still apply. Setup credentials
+never use the gateway's unverified development fallback. Gateway proxy tests
+exercise signed tokens through policy and forwarding, beyond direct service tests.
