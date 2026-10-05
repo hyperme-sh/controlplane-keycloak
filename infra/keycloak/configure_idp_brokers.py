@@ -8,7 +8,7 @@ This script never invents a client id or secret and never prints one.
 Which enterprise an organization belongs to is saved by that organization's
 owner in Panopticon. This script does not apply an operator map.
 
-The same process upserts the public clients ``hypermesh-native`` and
+The same process upserts ``hypermesh-native``, ``hypermesh-host-setup`` and
 ``s3rch-web`` from the realm file, each in its own step, before the broker
 update. A failure of one client step is reported on its own and still lets
 the other steps run. Re-run updates each client in place and does not create
@@ -28,6 +28,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from hypermesh_host_setup import HostSetupClientError, ensure_hypermesh_host_setup
 from hypermesh_native import NativeClientError, ensure_hypermesh_native
 from s3rch_web import S3rchClientError, ensure_s3rch_web
 from idp_enterprise import (
@@ -234,7 +235,7 @@ def configure(admin: AdminClient) -> None:
 
 
 def apply_realm_updates(admin: AdminClient) -> int:
-    """Native client, then s3r.ch client, then brokers. Each failure is its own error.
+    """Native, host setup and s3r.ch clients, then brokers. Each failure is its own error.
 
     The test refresh treats a non-zero exit from this process as one
     non-fatal warning. Each client line is printed on its own so that
@@ -250,6 +251,11 @@ def apply_realm_updates(admin: AdminClient) -> int:
             f"ERROR: hypermesh-native client was not applied: {exc}",
             file=sys.stderr,
         )
+    try:
+        ensure_hypermesh_host_setup(admin)
+    except (HostSetupClientError, ConfigureError, urllib.error.URLError) as exc:
+        failed = True
+        print(f"ERROR: hypermesh-host-setup client was not applied: {exc}", file=sys.stderr)
     try:
         ensure_s3rch_web(admin)
     except (S3rchClientError, ConfigureError, urllib.error.URLError) as exc:

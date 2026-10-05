@@ -53,6 +53,30 @@ The visor and CLI request scope `openid` only. Default client scopes `basic`, `r
 
 `s3rch-web` is declared in the same realm file and upserted by the same script, in its own step after `hypermesh-native` and before the broker update. One row for `clientId=s3rch-web`, the same internal id on re-run, no client secret. Redirect URIs are exact callback paths (no wildcard). Protocol mappers are only `idp_enterprise.token_claim_mappers()`. A failure of this step is printed on its own as `s3rch-web client was not applied` and does not stop the native client or the brokers. Do not create a second IdP or a Microsoft / GitHub / Google app for s3r.ch. Do not add `s3rch-web` to `KEYCLOAK_ALLOWED_CLIENT_IDS`: the backup session is an s3r.ch cookie, not a control-plane access token.
 
+### Host setup device login
+
+`hypermesh-host-setup` displays **Hypermesh host setup** during device consent.
+It is a public device-only client with S256 PKCE, default scopes `basic` and
+`email`, and no optional scopes. Profile, roles, groups, enterprise IdP claims,
+redirect-based login and offline access are excluded. Its explicit audience
+mapper lets APIs validate the token without depending on the roles scope.
+Subject and email identify the existing account; tenant membership and host
+organization authority are checked against the database. Scope reduction does
+not replace those authorization checks.
+
+The realm import and `configure_idp_brokers.py` apply the same declaration.
+Live refresh removes extra scopes and mappers, and reports host-client failures
+separately. Compose and the backend default allowlist include the new client;
+installations overriding `KEYCLOAK_ALLOWED_CLIENT_IDS` must add it explicitly.
+Deploy this backend/realm change before releasing the installer client change.
+
+Registration and certification owner approval accept the dedicated client and
+the legacy `hypermesh-native` client so previously downloaded installers can
+finish. Browser registration approval still requires `controlplane-frontend`;
+device sign-in alone does not approve a host or enable selling. The visor/CLI
+client retains its existing behavior. After rollout, verify the real device
+flow on AGX and confirm both the sign-in name and separate host approval.
+
 ### Bootstrap user (OIDC / IdP, not a standing password)
 
 The realm file includes `chris@fyberlabs.com` so the test plane has one mailbox without hand-creating a user in the Keycloak UI:
