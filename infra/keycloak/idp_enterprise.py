@@ -99,6 +99,11 @@ def _mapper(
 def claim_copy_mappers() -> list[dict[str, Any]]:
     """Copy org facts onto the user. The enterprise binding is not a mapper."""
     return [
+        _mapper("microsoft-session-identity", "microsoft", "oidc-user-session-note-idp-mapper", {
+            "claims": json.dumps([{"key": "tid", "value": "[0-9a-fA-F-]{36}"},
+                                  {"key": "oid", "value": "[0-9a-fA-F-]{36}"}]),
+            "are.claim.values.regex": "true",
+        }),
         _mapper(
             "microsoft-provider",
             "microsoft",
@@ -189,4 +194,12 @@ def token_claim_mappers() -> list[dict[str, Any]]:
                 "config": config,
             }
         )
+    for note, claim in (("identity_provider", "login_provider"),
+                        ("tid", "entra_tenant_id"), ("oid", "entra_object_id")):
+        found.append({"name": claim, "protocol": "openid-connect",
+                      "protocolMapper": "oidc-usersessionmodel-note-mapper",
+                      "consentRequired": False,
+                      "config": {"user.session.note": note, "claim.name": claim,
+                                 "jsonType.label": "String", "access.token.claim": "true",
+                                 "id.token.claim": "false", "userinfo.token.claim": "false"}})
     return found
