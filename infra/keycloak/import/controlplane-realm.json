@@ -449,7 +449,8 @@
         "https://portal.test.hyperme.sh"
       ],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://portal.test.hyperme.sh/signed-out##https://portal.hyperme.sh/signed-out##http://localhost:3000/signed-out##http://127.0.0.1:3000/signed-out"
       },
       "protocolMappers": [
         {
