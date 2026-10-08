@@ -243,3 +243,26 @@ resume. These paths remain authenticated, with exact method/path matching and
 tenant cross-checks; backend ownership checks still apply. Setup credentials
 never use the gateway's unverified development fallback. Gateway proxy tests
 exercise signed tokens through policy and forwarding, beyond direct service tests.
+
+### Portal sign-out
+
+The portal clears its Auth.js session and tenant cache, then navigates the browser
+through Keycloak's OIDC logout endpoint. Keycloak can request logout confirmation;
+complete it to end the realm SSO session. Its return page is `/signed-out`, which
+stays public until the user chooses to sign in again. This does not sign the user
+out of an upstream Microsoft, Google, or GitHub account.
+
+`configure_idp_brokers.py` reconciles the frontend client's explicit test,
+production and local post-logout return URLs during deployment. Apply that realm
+configuration with the frontend change; changing the import alone does not update
+an existing realm. `AUTH_URL`, when configured, supplies the public portal origin.
+
+### Portal logout deployment ordering
+
+The test portal image workflow reconciles and reads back the existing Keycloak
+client's logout allowlist before changing the App Service image. It sends the
+checked-out reconciler to the single test-plane VM in the configured resource
+group. The VM uses its configured managed identity and Key Vault admin password;
+credentials remain on the VM. A missing VM, failed reconciliation, or unconfirmed
+guest result stops rollout while leaving the current portal image running.
+Production realm reconciliation must likewise precede portal rollout.
