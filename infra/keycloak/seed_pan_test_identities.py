@@ -109,7 +109,7 @@ def catalog_invariants() -> None:
     if names != ["renter", "leaser", "admin"]:
         raise SeedError("usernames must be exactly renter, leaser, admin")
     if len(IDENTITIES) != 3:
-        raise SeedError("Chris split requires exactly three identities")
+        raise SeedError("identity split requires exactly three identities")
     kv_names = [ident.kv_secret for ident in IDENTITIES]
     if len(kv_names) != len(set(kv_names)):
         raise SeedError("duplicate identity KV secret name")
