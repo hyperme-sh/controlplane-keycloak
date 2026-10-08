@@ -175,7 +175,7 @@ def upsert_mapper(admin: AdminClient, spec: dict[str, Any]) -> None:
     )
 
 
-def ensure_token_claims(admin: AdminClient) -> None:
+def ensure_portal_logout(admin: AdminClient) -> str:
     clients = admin.get(f"/clients?clientId={FRONTEND_CLIENT_ID}") or []
     client = next(
         (
@@ -200,6 +200,14 @@ def ensure_token_claims(admin: AdminClient) -> None:
     if attributes.get("post.logout.redirect.uris") != logout_uris:
         attributes["post.logout.redirect.uris"] = logout_uris
         admin.put(f"/clients/{client_id}", {**details, "attributes": attributes})
+    verified = admin.get(f"/clients/{client_id}")
+    if (verified.get("attributes") or {}).get("post.logout.redirect.uris") != logout_uris:
+        raise ConfigureError("portal logout allowlist did not converge")
+    return client_id
+
+
+def ensure_token_claims(admin: AdminClient) -> None:
+    client_id = ensure_portal_logout(admin)
     current = admin.get(f"/clients/{client_id}/protocol-mappers/models") or []
     by_name = {
         str(item.get("name")): item

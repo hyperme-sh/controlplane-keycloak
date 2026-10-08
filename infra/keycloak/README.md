@@ -256,3 +256,13 @@ out of an upstream Microsoft, Google, or GitHub account.
 production and local post-logout return URLs during deployment. Apply that realm
 configuration with the frontend change; changing the import alone does not update
 an existing realm. `AUTH_URL`, when configured, supplies the public portal origin.
+
+### Portal logout deployment ordering
+
+The test portal image workflow reconciles and reads back the existing Keycloak
+client's logout allowlist before changing the App Service image. It sends the
+checked-out reconciler to the single test-plane VM in the configured resource
+group. The VM uses its configured managed identity and Key Vault admin password;
+credentials remain on the VM. A missing VM, failed reconciliation, or unconfirmed
+guest result stops rollout while leaving the current portal image running.
+Production realm reconciliation must likewise precede portal rollout.
