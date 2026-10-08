@@ -24,7 +24,7 @@ Compose uses a dedicated Postgres database `keycloak` (`KC_DB_URL` → `jdbc:pos
 
 On first start with `--import-realm`, Keycloak loads [import/controlplane-realm.json](import/controlplane-realm.json) (realm `controlplane`). Later restarts **skip** an already-imported realm. Changing redirect URIs in git does not update a live `auth.test` client.
 
-`controlplane-frontend` Valid redirect URIs include localhost Next/Vite plus `https://portal.test.hyperme.sh/*`, `https://portal.test.hyperme.sh/api/auth/callback`, and `https://portal.test.hyperme.sh/api/auth/callback/keycloak` (Auth.js Keycloak provider). Web origin: `https://portal.test.hyperme.sh`. Do not invent a second client.
+`controlplane-frontend` Valid redirect URIs include localhost Next/Vite plus `https://portal.test.hyperme.sh/*`, `https://portal.test.hyperme.sh/api/auth/callback`, and `https://portal.test.hyperme.sh/api/auth/callback/keycloak` (Auth.js Keycloak provider). Web origin: `https://portal.test.hyperme.sh`. Do not add a second client.
 
 After merge, apply those URIs on the live client (existing admin path — no new seed):
 
@@ -136,7 +136,7 @@ One OAuth app per provider. Do not commit the client id or secret.
 | `KC_IDP_GOOGLE_CLIENT_ID` | `panopticon-test-idp-google-client-id` |
 | `KC_IDP_GOOGLE_CLIENT_SECRET` | `panopticon-test-idp-google-client-secret` |
 
-`refresh-test.sh` reads those names and runs `configure_idp_brokers.py` after Keycloak is up. Import is first-start only, so a realm that already exists does not see new env values until that script updates the broker. Empty client id or secret leaves that broker unchanged. Do not invent values.
+`refresh-test.sh` reads those names and runs `configure_idp_brokers.py` after Keycloak is up. Import is first-start only, so a realm that already exists does not see new env values until that script updates the broker. Empty client id or secret leaves that broker unchanged. Use real broker credentials only.
 
 The same refresh sets `KC_TEST_REGISTRATION=1`. That opens Register on the live test realm only: email is the username, and email verification stays off because this plane has no mailer. The realm file stays `registrationAllowed: false`, and the password grant stays disabled. An account created there does not move to production and can be lost when the test database is replaced. Do not set `KC_TEST_REGISTRATION` on a production import.
 
@@ -178,7 +178,7 @@ The control plane API only sees the **Bearer access token** on `/account/me`. If
 
 The realm import **configures** OTP (TOTP) and WebAuthn as optional required actions (`CONFIGURE_TOTP`, `webauthn-register`, `webauthn-register-passwordless`, recovery codes). They are **enabled but not default** (`defaultAction: false`) so unattended local smoke that never completes `chris@fyberlabs.com` login still works (`test_mfa_is_optional_but_configured`).
 
-The imported `chris@fyberlabs.com` user has no password in git. First login uses an IdP broker (or a password Chris sets in Admin Console / reset mail). User required actions are `UPDATE_PASSWORD` + `CONFIGURE_TOTP`. WebAuthn stays available and preferred for that mailbox; it is **not** a required action, so it does not block first TEST Checkout. `OIDC_REQUIRE_MFA` stays false until after first login.
+The imported `chris@fyberlabs.com` user has no password in git. First login uses an IdP broker (or a password an admin sets in Admin Console / reset mail). User required actions are `UPDATE_PASSWORD` + `CONFIGURE_TOTP`. WebAuthn stays available and preferred for that mailbox; it is **not** a required action, so it does not block first TEST Checkout. `OIDC_REQUIRE_MFA` stays false until after first login.
 
 ### Pan-test identities (renter / leaser / admin)
 
