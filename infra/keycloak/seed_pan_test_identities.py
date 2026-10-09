@@ -299,6 +299,8 @@ def upsert_user(admin: AdminClient, ident: Identity) -> tuple[dict[str, Any], bo
         "firstName": ident.first_name,
         "lastName": ident.last_name,
         "requiredActions": [],
+        # These shared test credentials represent automation, not named people.
+        "attributes": {**((existing or {}).get("attributes") or {}), "account_type": ["service"]},
     }
     created = False
     if existing is None:

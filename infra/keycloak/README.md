@@ -266,3 +266,69 @@ group. The VM uses its configured managed identity and Key Vault admin password;
 credentials remain on the VM. A missing VM, failed reconciliation, or unconfirmed
 guest result stops rollout while leaving the current portal image running.
 Production realm reconciliation must likewise precede portal rollout.
+
+## Human and AI/service account classification
+
+Private model admission in [Panopticon #374](https://github.com/FyberLabs/panopticon/pull/374)
+requires both a named human binding and verified interactive authentication.
+`account_type` is an administrator-owned, single-value profile attribute with
+only `human` and `service` allowed. Account self-service, registration, and
+brokered email/group claims cannot set it. A password, OTP, role, or email alone
+does not classify a principal as human. The frontend mapper reads this protected
+attribute; client-credential clients always emit `service`.
+
+Use a separate service account/client for an AI or automation process. AI using
+a browser account must have `account_type=service`, even if it uses password or
+OTP authentication. Do not share a named person's credentials with automation.
+An unclassified account remains unable to approve private models. Classification
+does not grant any tenant role; #374 separately checks active auditor/admin
+membership and purpose-bound frontend sessions. The shared `renter`, `leaser`,
+and `admin` test identities are classified as `service`; a separately provisioned
+named person is required for human approval tests.
+
+The realm import declares profile protection and token mappers. Keycloak skips
+an existing realm during import, so run the following setup on **both fresh and
+existing realms**, before enabling private admission:
+
+```sh
+# Credentials come from the existing secret injection, not CLI arguments.
+# Run beside Keycloak through its private/loopback Admin API.
+export KEYCLOAK_INTERNAL_URL=http://127.0.0.1:8081
+python3 infra/keycloak/account_types.py
+
+# After an administrator verifies the named person, use the immutable Keycloak
+# user UUID from the Admin Console. Repeat flags to classify more accounts.
+python3 infra/keycloak/account_types.py --human-user-id <person-user-uuid>
+python3 infra/keycloak/account_types.py --service-user-id <ai-user-uuid>
+```
+
+The script uses `KC_BOOTSTRAP_ADMIN_USERNAME` and
+`KC_BOOTSTRAP_ADMIN_PASSWORD`. It preserves unrelated profile metadata and client
+mappers, reconciles its owned mappers, and configures authenticator references on
+the realm's current browser flow (`pwd`, `otp`, `webauthn`). These references
+record completed authenticators through Keycloak's AMR mapper; the script never
+hardcodes `pwd` into tokens or changes authentication requirements. Unsupported
+custom flows fail setup rather than manufacturing evidence. Duplicate account
+claim mappers also fail setup. Client service accounts cannot be classified as
+human by the script. Use only trusted administrators for this operation and do
+not configure an upstream broker mapper to write `account_type`.
+
+Existing named people require explicit classification by UUID. New registrations
+and brokered users receive no default human classification. Sign in again after
+classification to obtain fresh claims; older tokens retain their original claims
+until expiry. Broker-only sessions without a completed supported authenticator
+remain unable to approve: their authentication flow must provide verified AMR
+before rollout. Check `account_type=human`, an actual completed-method `amr`, and
+successful tenant-session forwarding with #374 before enabling admission.
+Revoking human status also requires revoking existing sessions or waiting for
+issued tokens to expire. Disabling private admission is the immediate rollback;
+keep the protected attribute and classification evidence.
+
+Relevant Keycloak contracts: [user profile permissions](https://www.keycloak.org/docs/26.5.7/server_admin/index.html#user-profile)
+and [token/AMR mappers](https://www.keycloak.org/admin-api/protocol-mappers).
+
+The opt-in live regression runs against a disposable loopback Keycloak 26.5
+container, using `KEYCLOAK_CLASSIFICATION_TEST_URL` and
+`KEYCLOAK_CLASSIFICATION_TEST_ADMIN_PASSWORD`. It replaces that container's
+`controlplane` realm, checks real PKCE and client-credential tokens, and attempts
+self-service classification forgery. Never point it at a shared or deployed realm.
