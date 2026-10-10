@@ -332,3 +332,12 @@ container, using `KEYCLOAK_CLASSIFICATION_TEST_URL` and
 `KEYCLOAK_CLASSIFICATION_TEST_ADMIN_PASSWORD`. It replaces that container's
 `controlplane` realm, checks real PKCE and client-credential tokens, and attempts
 self-service classification forgery. Never point it at a shared or deployed realm.
+
+## Production account creation
+
+Production keeps local self-registration disabled. New portal accounts use
+Microsoft, GitHub or Google; `/signup` starts provider sign-in without
+`prompt=create`. Existing local accounts can still sign in. Email/password
+registration needs verified email delivery before it can be offered; the
+`KC_TEST_REGISTRATION=1` override remains test-plane only. This implements
+option 2 from Panopticon #372 without enabling an unconfigured production mailer.
