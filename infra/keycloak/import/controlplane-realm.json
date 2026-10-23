@@ -418,6 +418,19 @@
       ]
     },
     {
+      "clientId": "auth-connect-introspection",
+      "name": "Auth payout session introspection",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "protocol": "openid-connect"
+    },
+    {
       "clientId": "controlplane-frontend",
       "name": "SPA (Vite / Next.js)",
       "enabled": true,
