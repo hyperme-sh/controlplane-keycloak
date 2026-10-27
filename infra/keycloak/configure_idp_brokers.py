@@ -289,6 +289,21 @@ def apply_realm_updates(admin: AdminClient) -> int:
     except ConfigureError as exc:
         failed = True
         print(f"ERROR: IdP broker configure failed: {exc}", file=sys.stderr)
+    # Native payout issuer setup is an explicit sandbox operation, never a
+    # consequence of importing a realm file or enabling an unrelated broker.
+    flag = _env("PAYMENT_CONNECT_NATIVE_ISSUER_ENABLED")
+    if flag not in ("", "false", "true"):
+        failed = True
+        print("ERROR: invalid native issuer enablement", file=sys.stderr)
+    elif flag == "true":
+        try:
+            if _env("KC_TEST_REGISTRATION") != "1":
+                raise ValueError("Test issuer profile required")
+            from connect_issuer import configure as configure_connect_issuer
+            configure_connect_issuer(admin, _env("AUTH_CONNECT_INTROSPECTION_CLIENT_SECRET"))
+        except (ValueError, ConfigureError, urllib.error.URLError):
+            failed = True
+            print("ERROR: native payout issuer was not applied; reconcile issuer configuration", file=sys.stderr)
     return 1 if failed else 0
 
 
