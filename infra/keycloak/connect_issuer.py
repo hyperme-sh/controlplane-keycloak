@@ -13,6 +13,7 @@ FLOW = "panopticon-connect-browser-v1"
 CLIENT = "auth-connect-introspection"
 FRONTEND = "controlplane-frontend"
 LOA = "conditional-level-of-authentication"
+AMR_MAX_AGE_SECONDS = 300
 
 
 class ConnectIssuerError(ValueError):
@@ -203,7 +204,12 @@ def configure(admin, secret):
         configure_execution(
             admin,
             execution,
-            {"default.reference.value": reference},
+            {
+                "default.reference.value": reference,
+                # Keycloak defaults to zero: the first factor otherwise expires
+                # while the user enters OTP or the browser exchanges its code.
+                "default.reference.maxAge": str(AMR_MAX_AGE_SECONDS),
+            },
             "connect-amr-" + execution["id"],
             source_configs,
         )
@@ -272,7 +278,10 @@ def configure(admin, secret):
                 "auth-username-password-form": "pwd",
                 "auth-otp-form": "otp",
             }.get(execution.get("providerId"))
-            if expected and reference != expected:
+            if expected and (
+                reference != expected
+                or config.get("default.reference.maxAge") != str(AMR_MAX_AGE_SECONDS)
+            ):
                 raise ConnectIssuerError("Authentication-method reference unverified")
             if not expected and set(str(reference).replace(",", " ").split()) & {
                 "pwd",
