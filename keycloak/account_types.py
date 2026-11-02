@@ -92,6 +92,9 @@ def ensure_mapper(admin, client_id, wanted):
         raise AccountTypeError("Token mapper verification failed")
 
 
+AMR_MAX_AGE_SECONDS = 300
+
+
 def ensure_references(admin):
     realm = admin.get("")
     flow = realm.get("browserFlow")
@@ -105,13 +108,13 @@ def ensure_references(admin):
         config_id = execution.get("authenticationConfig")
         if config_id:
             current = admin.get("/authentication/config/" + config_id)
-            config = {**(current.get("config") or {}), "default.reference.value": reference}
+            config = {**(current.get("config") or {}), "default.reference.value": reference, "default.reference.maxAge": str(AMR_MAX_AGE_SECONDS)}
             if current.get("config") != config:
                 admin.put("/authentication/config/" + config_id, {**current, "config": config})
         else:
             admin.post(f"/authentication/executions/{execution['id']}/config", {
                 "alias": "admission-amr-" + execution["id"],
-                "config": {"default.reference.value": reference},
+                "config": {"default.reference.value": reference, "default.reference.maxAge": str(AMR_MAX_AGE_SECONDS)},
             })
         count += 1
     if count == 0:
@@ -154,6 +157,7 @@ def classify(admin, user_id, account_type):
 
 def main(argv=None):
     from configure_idp_brokers import AdminClient, ConfigureError, admin_token
+    from admin_endpoint import admin_endpoint
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--human-user-id", action="append", default=[])
@@ -161,7 +165,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if set(args.human_user_id) & set(args.service_user_id):
         parser.error("An account cannot be both human and service")
-    base = os.environ.get("KEYCLOAK_INTERNAL_URL", "http://127.0.0.1:8081")
+    base = admin_endpoint()
     username = os.environ.get("KC_BOOTSTRAP_ADMIN_USERNAME", "")
     password = os.environ.get("KC_BOOTSTRAP_ADMIN_PASSWORD", "")
     if not username or not password:

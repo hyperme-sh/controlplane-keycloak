@@ -56,7 +56,7 @@ def test_common_tenant_accepts_personal_and_work_accounts() -> None:
     assert endpoints["authorizationUrl"] == (
         "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
     )
-    assert endpoints["issuer"].endswith("/common/v2.0")
+    assert endpoints["issuer"] == f"https://login.microsoftonline.com/{idp.MSA_TENANT_ID}/v2.0"
     with pytest.raises(idp.IdpMapError):
         idp.microsoft_endpoints("https://evil.example")
 

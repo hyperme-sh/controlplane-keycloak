@@ -35,6 +35,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from admin_endpoint import admin_endpoint
+
 REALM = "controlplane"
 FRONTEND_CLIENT_ID = "controlplane-frontend"
 PORTAL_ROLES = frozenset({"renter", "host", "admin"})
@@ -423,9 +425,14 @@ def seed(
         uid = str(user["id"])
         reconcile_realm_roles(admin, uid, ident.realm_roles, roles)
         reconcile_groups(admin, uid, ident.groups, groups)
-        if created or rotate_passwords:
+        credentials = [] if created or rotate_passwords else admin.get(f"/users/{uid}/credentials")
+        if not isinstance(credentials, list) or any(not isinstance(c, dict) or not isinstance(c.get("type"), str) for c in credentials):
+            raise SeedError("Invalid user credential inventory")
+        has_password = any(c["type"] == "password" for c in credentials)
+        if created or rotate_passwords or not has_password:
             set_password(admin, uid, passwords[ident.username])
-            actions[ident.username] = "created" if created else "password-rotated"
+            actions[ident.username] = ("created" if created else
+                                       "password-rotated" if rotate_passwords else "password-set")
         else:
             actions[ident.username] = "updated"
     return actions
@@ -474,9 +481,7 @@ def main(argv: list[str] | None = None) -> int:
         passwords = require_passwords()
         bootstrap_user = require_env("KC_BOOTSTRAP_ADMIN_USERNAME")
         bootstrap_password = require_env("KC_BOOTSTRAP_ADMIN_PASSWORD")
-        base_url = os.environ.get("KEYCLOAK_URL", "http://127.0.0.1:8081").strip()
-        if not base_url:
-            raise SeedError("missing or empty KEYCLOAK_URL")
+        base_url = admin_endpoint()
         if args.wait_seconds:
             wait_until_ready(base_url, args.wait_seconds)
         actions = seed(

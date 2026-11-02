@@ -26,6 +26,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from admin_endpoint import admin_endpoint
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from hypermesh_host_setup import HostSetupClientError, ensure_hypermesh_host_setup
@@ -149,7 +151,7 @@ def update_broker_app(
     config["clientId"] = client_id
     config["clientSecret"] = client_secret
     if alias == "microsoft":
-        config.update(microsoft_endpoints(tenant))
+        config.update(microsoft_endpoints(tenant, _env("KC_IDP_MICROSOFT_ALLOWED_TENANT_IDS")))
     current["config"] = config
     admin.put(f"/identity-provider/instances/{alias}", current)
     print(f"  updated {alias} client id")
@@ -308,7 +310,7 @@ def apply_realm_updates(admin: AdminClient) -> int:
 
 
 def main() -> int:
-    base = _env("KEYCLOAK_URL") or "http://127.0.0.1:8081"
+    base = admin_endpoint()
     username = _env("KC_BOOTSTRAP_ADMIN_USERNAME")
     password = _env("KC_BOOTSTRAP_ADMIN_PASSWORD")
     if not username or not password:

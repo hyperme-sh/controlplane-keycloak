@@ -167,7 +167,7 @@
         "tokenUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/token",
         "logoutUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/logout",
         "userInfoUrl": "https://graph.microsoft.com/oidc/userinfo",
-        "issuer": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/v2.0",
+        "issuer": "${KC_IDP_MICROSOFT_ISSUERS:https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0}",
         "jwksUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/discovery/v2.0/keys",
         "validateSignature": "true",
         "useJwksUrl": "true",

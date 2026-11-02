@@ -5,21 +5,21 @@ stays an individual. Which enterprise an organization belongs to is an
 organization-owner setting in Panopticon, not a Key Vault map.
 
 Microsoft personal accounts use the public tenant
-``9188040d-6c67-4c5b-b112-36a304b66dad``. ``common`` on the app accepts both
-personal and work accounts; a specific tenant id is organization-only.
+``9188040d-6c67-4c5b-b112-36a304b66dad``. ``common`` accepts personal and explicitly allowlisted work accounts;
+a specific tenant UUID restricts the issuer to that directory.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
 PROVIDERS = ("microsoft", "google", "github")
 # Microsoft documents this tenant id for personal Microsoft accounts.
 MSA_TENANT_ID = "9188040d-6c67-4c5b-b112-36a304b66dad"
-_TENANT_RE = re.compile(r"[A-Za-z0-9-]{1,64}\Z")
 
 
 class IdpMapError(ValueError):
@@ -32,18 +32,38 @@ class AccountMapping:
     org: str | None
 
 
-def microsoft_endpoints(tenant: str | None) -> dict[str, str]:
-    """Authorization endpoints. Empty tenant stays ``common`` (personal + work)."""
-    chosen = (tenant or "").strip() or "common"
-    if not _TENANT_RE.fullmatch(chosen):
-        raise IdpMapError("microsoft tenant id is not usable")
+def microsoft_endpoints(tenant: str | None, allowed_tenants: str = "") -> dict[str, str]:
+    """Use exact Microsoft tenant issuers, never disable issuer validation.
+
+    Multi-tenant endpoints require explicit work-directory UUIDs. Personal
+    accounts use Microsoft's fixed consumer tenant. Domain aliases are rejected
+    because the token issuer contains a UUID, not the domain alias.
+    """
+    chosen = (tenant or "").strip().lower() or "common"
+    try:
+        approved = {str(uuid.UUID(value.strip())) for value in allowed_tenants.split(",") if value.strip()}
+        if chosen not in {"common", "organizations", "consumers"}:
+            chosen = str(uuid.UUID(chosen))
+            issuers = {chosen}
+        elif chosen == "consumers":
+            issuers = {MSA_TENANT_ID}
+        elif chosen == "organizations":
+            issuers = approved - {MSA_TENANT_ID}
+            if not issuers:
+                raise ValueError("Work tenant allowlist required")
+        else:
+            issuers = approved | {MSA_TENANT_ID}
+    except ValueError as exc:
+        raise IdpMapError("Microsoft tenant configuration requires valid directory UUIDs and an explicit work allowlist") from exc
     base = f"https://login.microsoftonline.com/{chosen}"
     return {
         "authorizationUrl": f"{base}/oauth2/v2.0/authorize",
         "tokenUrl": f"{base}/oauth2/v2.0/token",
         "logoutUrl": f"{base}/oauth2/v2.0/logout",
-        "issuer": f"{base}/v2.0",
+        "issuer": ",".join(f"https://login.microsoftonline.com/{value}/v2.0" for value in sorted(issuers)),
         "jwksUrl": f"{base}/discovery/v2.0/keys",
+        "validateSignature": "true",
+        "useJwksUrl": "true",
     }
 
 

@@ -50,3 +50,34 @@ Offline checks use fake admin APIs. They do not validate live Keycloak tokens,
 broker login, real client reconciliation, deployment or dependent service policy.
 The identity-seed service integration and live account/issuer suites require
 separate service dependencies and a disposable Keycloak environment.
+
+## Administrative endpoint and identity policies
+
+All administrative entry points prefer a nonblank `KEYCLOAK_INTERNAL_URL`, then
+accept legacy `KEYCLOAK_URL`, then default to `http://127.0.0.1:8081`. Whitespace
+and trailing slashes are normalized. Set the canonical variable for new deployments.
+
+Microsoft uses the generic OIDC broker with exact issuer validation and Microsoft
+JWKS signature validation enabled. `common` endpoints support personal accounts
+and explicitly approved work directories. During reconciliation, set
+`KC_IDP_MICROSOFT_ALLOWED_TENANT_IDS` to a comma-separated list of work-directory
+UUIDs. An empty list permits only Microsoft's personal-account tenant. The
+`organizations` endpoint requires a nonempty work allowlist; `consumers` permits
+only the personal tenant. A specific tenant must be a UUID, not a domain alias.
+
+For first realm import, set `KC_IDP_MICROSOFT_ISSUERS` to the corresponding
+comma-separated exact issuer URLs (`https://login.microsoftonline.com/<UUID>/v2.0`).
+Its default is the personal-account issuer. If selecting a specific tenant or
+work directories at import, configure both endpoints and issuers. Reconciliation
+replaces the issuer list from the UUID policy above. Never use `/common/v2.0`, a
+wildcard, or an empty issuer to bypass validation. Arbitrary unlisted work tenants
+are intentionally refused. These offline checks do not establish live broker login.
+
+Authenticator references have a 300-second lifetime from the completed
+authentication step, on both creation and update. Unrelated authenticator settings
+are retained; this does not manufacture an authentication-method claim.
+
+The test identity seed initializes passwords for new users and existing users
+without a password credential. Existing passwords remain unchanged unless
+`--rotate-passwords` is explicitly supplied. A failed or malformed credential
+inventory stops seeding instead of assuming that a password is missing.
