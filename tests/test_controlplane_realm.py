@@ -562,6 +562,7 @@ def test_s3rch_web_client_contract() -> None:
     assert client["redirectUris"] == [
         "https://s3r.ch/api/identity/oauth/callback",
         "https://www.s3r.ch/api/identity/oauth/callback",
+        "https://test.s3r.ch/api/identity/oauth/callback",
         "http://localhost:3000/api/identity/oauth/callback",
         "http://127.0.0.1:3000/api/identity/oauth/callback",
     ]

@@ -29,10 +29,11 @@ CLIENT_ID = "s3rch-web"
 REALM_PATH = Path(__file__).resolve().parent / "import" / "controlplane-realm.json"
 CALLBACK_PATH = "/api/identity/oauth/callback"
 
-# Exact callback URIs. No wildcards. Prod apex + www, and local Next on :3000.
+# Exact callbacks: production, public merge-tracking test, and local Next.
 REDIRECT_URIS = (
     "https://s3r.ch" + CALLBACK_PATH,
     "https://www.s3r.ch" + CALLBACK_PATH,
+    "https://test.s3r.ch" + CALLBACK_PATH,
     "http://localhost:3000" + CALLBACK_PATH,
     "http://127.0.0.1:3000" + CALLBACK_PATH,
 )
@@ -111,7 +112,7 @@ def validate_declared_client(client: dict[str, Any], realm: dict[str, Any] | Non
         parsed = urlparse(uri)
         if not parsed.path.endswith(CALLBACK_PATH):
             raise S3rchClientError(f"{CLIENT_ID} redirect must end at the OAuth callback")
-        if parsed.scheme == "https" and parsed.hostname not in {"s3r.ch", "www.s3r.ch"}:
+        if parsed.scheme == "https" and parsed.hostname not in {"s3r.ch", "www.s3r.ch", "test.s3r.ch"}:
             raise S3rchClientError(f"{CLIENT_ID} https redirect must be an s3r.ch host")
         if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1"}:
             raise S3rchClientError(f"{CLIENT_ID} http redirect must be loopback")
