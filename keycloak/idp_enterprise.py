@@ -2,7 +2,7 @@
 
 Microsoft, Google, and GitHub each use one OAuth app. A personal account
 stays an individual. Which enterprise an organization belongs to is an
-organization-owner setting in (s)panopticon, not a Key Vault map.
+organization-owner setting in spanopticon, not a Key Vault map.
 
 Microsoft personal accounts use the public tenant
 ``9188040d-6c67-4c5b-b112-36a304b66dad``. ``common`` accepts personal and explicitly allowlisted work accounts;
