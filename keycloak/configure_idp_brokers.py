@@ -6,7 +6,7 @@ the placeholder client id until this updates it. Credentials come from env
 vars that refresh injects from Key Vault. Empty values skip that provider.
 This script never invents a client id or secret and never prints one.
 Which enterprise an organization belongs to is saved by that organization's
-owner in Panopticon. This script does not apply an operator map.
+owner in (s)panopticon. This script does not apply an operator map.
 
 The same process upserts ``hypermesh-native``, ``hypermesh-host-setup`` and
 ``s3rch-web`` from the realm file, each in its own step, before the broker
