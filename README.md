@@ -96,3 +96,30 @@ organization policy may shorten it). Expired evidence fails closed: validate a
 new main revision. The publisher verifies the run, source, workflow and artifact
 digest independently of release metadata. Repository immutable releases must be
 enabled. See the [shared release contract](https://github.com/hyperme-sh/.github/blob/7749591fccd30d46ba9b0adabe82114001c9d0de/actions/release-channel/README.md).
+
+## Account closure provisioning
+
+`keycloak/account_closure.py` adopts the private closure tooling from Panopticon
+#671/#672. Its default invocation prints a plan without authenticating. An
+explicit `--apply` provisions **disabled** reader and worker clients with
+distinct secrets and narrowly scoped native management roles. It never enables
+these clients, rotates existing credentials, or selects operators automatically.
+
+Configuration uses `KEYCLOAK_INTERNAL_URL` (HTTPS or local loopback), the existing
+bootstrap administrator variables, `ACCOUNT_CLOSURE_KEYCLOAK_REALM` (default
+`controlplane`), `ACCOUNT_CLOSURE_KEYCLOAK_READER_SECRET`, and
+`ACCOUNT_CLOSURE_KEYCLOAK_CLIENT_SECRET`. Secrets belong in the deployment owner's
+secret injection, never command arguments or repository files. This tool requires
+the canonical endpoint explicitly; it does not fall back to `KEYCLOAK_URL`.
+
+Optional `--human-user-id` / `--service-user-id` arguments require exact native
+UUIDs and administrator-owned account classification. The separate operator
+audience is `spanopticon-account-closure`; ordinary clients and closure credentials
+do not become operators. The `account:close` realm role is not a default grant.
+Existing client, mapper, scope or credential drift fails for reconciliation.
+
+Offline tests cover input refusal, transport bounds, disabled credential policy,
+operator classification and default-grant rejection, from source and the verified
+archive. No deployed realm is contacted. Disposable native-provider and consuming
+identity-validator qualification remain in adoption issue #9; source behavior and
+offline tests alone do not establish deployment readiness.
