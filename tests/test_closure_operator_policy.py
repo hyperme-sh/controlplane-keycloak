@@ -96,3 +96,65 @@ def test_default_role_or_group_cannot_grant_operator_authority(via_group):
 def test_incomplete_native_inventory_is_not_treated_as_empty(value):
     with pytest.raises(setup.ClosureSetupError, match="inventory"):
         setup.rows(value)
+
+
+@pytest.fixture(params=[setup.READER, setup.WORKER])
+def credential_inventory(request):
+    name = request.param
+    subject = str(uuid.uuid4())
+    spec = setup.client_spec(name)
+    role = {"id": "purpose-role", "name": setup.PURPOSES[name], "clientRole": True,
+            "containerId": "manager", "composite": name == setup.READER}
+    children = [{"id": item, "name": item, "clientRole": True,
+                 "containerId": "manager", "composite": False}
+                for item in ("query-users", "query-groups")] if name == setup.READER else []
+    user = {"id": subject, "attributes": {setup.PROTECTED_ATTRIBUTE: ["true"]}}
+    base = "/clients/credential"
+    grants = "/users/" + subject + "/role-mappings/clients/manager"
+    replies = {
+        "/clients?clientId=" + name: [{"id": "credential", "clientId": name}],
+        base: spec,
+        base + "/client-secret": {"value": "x" * 64},
+        base + "/default-client-scopes": [{"id": "basic", "name": "basic"}],
+        base + "/optional-client-scopes": [],
+        base + "/protocol-mappers/models": spec["protocolMappers"],
+        base + "/service-account-user": user,
+        "/users/" + subject: user,
+        "/clients/manager/roles/" + setup.PURPOSES[name]: role,
+        "/roles-by-id/purpose-role/composites": children,
+        grants: [role],
+        grants + "/composite": [role, *children],
+        base + "/scope-mappings/clients/manager": [role],
+        base + "/scope-mappings": {"clientMappings": {
+            "realm-management": {"id": "manager", "client": "realm-management", "mappings": [role]}}},
+    }
+    return name, subject, grants, replies
+
+
+def test_existing_credentials_accept_only_their_exact_effective_roles(credential_inventory):
+    name, subject, _, replies = credential_inventory
+    assert setup.ensure_credential(ReadOnlyAdmin(replies), name, "x" * 64, "manager") == subject
+
+
+@pytest.mark.parametrize("fault", ["realm-composite", "realm-scope-only", "inherited-grant", "other-client-scope", "malformed-scope", "missing-effective-role"])
+def test_existing_credentials_reject_hidden_authority(credential_inventory, fault):
+    name, _, grants, replies = credential_inventory
+    elevated = {"id": "hidden-admin", "name": "manage-users" if name == setup.READER else "manage-realm", "clientRole": True,
+                "containerId": "manager", "composite": False}
+    if fault in {"realm-composite", "realm-scope-only"}:
+        # The direct mapping is still correct, but a realm composite adds authority.
+        replies["/clients/credential/scope-mappings"]["realmMappings"] = [
+            {"id": "hidden", "name": "hidden", "composite": True}]
+        if fault == "realm-composite":
+            replies[grants + "/composite"].append(elevated)
+    elif fault == "inherited-grant":
+        replies[grants + "/composite"].append(elevated)
+    elif fault == "other-client-scope":
+        replies["/clients/credential/scope-mappings"]["clientMappings"]["other"] = {
+            "id": "other", "client": "other", "mappings": [elevated]}
+    elif fault == "malformed-scope":
+        replies["/clients/credential/scope-mappings"] = []
+    else:
+        replies[grants + "/composite"] = []
+    with pytest.raises(setup.ClosureSetupError):
+        setup.ensure_credential(ReadOnlyAdmin(replies), name, "x" * 64, "manager")

@@ -325,6 +325,31 @@ def ensure_credential(admin, name, secret, manager):
         item.get("id") for item in rows(admin.get(scope_path))
     } != {role["id"]}:
         raise ClosureSetupError("Closure credential grants unverified")
+    # Direct realm-management mappings are insufficient: a realm composite can
+    # smuggle management authority into both the scope and the service account.
+    inventory = admin.get(path + "/scope-mappings")
+    if not isinstance(inventory, dict) or rows(inventory.get("realmMappings", [])):
+        raise ClosureSetupError("Closure credential has unexpected realm scopes")
+    clients = inventory.get("clientMappings")
+    if not isinstance(clients, dict) or set(clients) != {"realm-management"}:
+        raise ClosureSetupError("Closure credential scope inventory differs")
+    mapping = clients["realm-management"]
+    if (not isinstance(mapping, dict) or mapping.get("id") != manager
+            or mapping.get("client") != "realm-management"
+            or {item.get("id") for item in rows(mapping.get("mappings"))} != {role["id"]}):
+        raise ClosureSetupError("Closure credential scope inventory differs")
+    # The composite endpoint includes authority inherited through realm roles
+    # and groups. Reader authority must remain exactly view-users and its two
+    # read-only children; worker authority must remain exactly manage-users.
+    effective = rows(admin.get(role_path + "/composite"))
+    expected_roles = [role, *children]
+    keys = ("id", "name", "clientRole", "containerId", "composite")
+    if len(effective) != len(expected_roles) or any(
+        not any(all(actual.get(key) == expected.get(key) for key in keys)
+                for actual in effective)
+        for expected in expected_roles
+    ):
+        raise ClosureSetupError("Closure credential effective management grants differ")
     return subject
 
 
