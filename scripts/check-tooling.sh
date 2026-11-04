@@ -13,3 +13,9 @@ uv export --frozen --no-emit-project --format requirements-txt --output-file "$s
 uv venv --python 3.13 "$scratch/venv"
 uv pip sync --python "$scratch/venv/bin/python" "$scratch/requirements.txt"
 (cd "$scratch/extracted" && "$scratch/venv/bin/python" -I -m pytest -q -c pyproject.toml tests)
+
+# Retain the exact validated bytes for the release channel; never rebuild them.
+if [[ -n "${RELEASE_ARTIFACT_DIR:-}" ]]; then
+  mkdir -p "$RELEASE_ARTIFACT_DIR"
+  cp "$scratch/controlplane-keycloak.tar.gz" "$RELEASE_ARTIFACT_DIR/"
+fi
