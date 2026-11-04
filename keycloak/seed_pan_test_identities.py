@@ -11,7 +11,7 @@ Creates or updates three split users (never one user with all roles):
   operator:program, and operator:resolve. Not org:own or org:manage.
 
 Passwords are read from env vars that refresh injects from Key Vault
-(``panopticon-test-*``). Empty/missing fails closed.
+(``spanopticon-test-*``). Empty/missing fails closed.
 This script never invents a password and never writes one to git.
 
 Rerun is additive-safe: no duplicate users/groups/roles, and passwords
@@ -44,8 +44,8 @@ PORTAL_GROUPS = frozenset({"renter", "host"})
 FORBIDDEN_NAMES = frozenset({"leaser"})
 
 # Existing KV names that must not be reused for these three accounts.
-BOOTSTRAP_KV_PASSWORD = "panopticon-test-keycloak-admin-password"
-API_ADMIN_KV_PASSWORD = "panopticon-test-admin-password"
+BOOTSTRAP_KV_PASSWORD = "spanopticon-test-keycloak-admin-password"
+API_ADMIN_KV_PASSWORD = "spanopticon-test-admin-password"
 
 
 class SeedError(RuntimeError):
@@ -73,8 +73,8 @@ IDENTITIES: tuple[Identity, ...] = (
         last_name="Renter",
         groups=("renter",),
         realm_roles=("renter",),
-        password_env="PANOPTICON_TEST_RENTER_PASSWORD",
-        kv_secret="panopticon-test-renter-password",
+        password_env="SPANOPTICON_TEST_RENTER_PASSWORD",
+        kv_secret="spanopticon-test-renter-password",
     ),
     Identity(
         username="leaser",
@@ -83,8 +83,8 @@ IDENTITIES: tuple[Identity, ...] = (
         last_name="Leaser",
         groups=("host",),
         realm_roles=("host",),
-        password_env="PANOPTICON_TEST_LEASER_PASSWORD",
-        kv_secret="panopticon-test-leaser-password",
+        password_env="SPANOPTICON_TEST_LEASER_PASSWORD",
+        kv_secret="spanopticon-test-leaser-password",
     ),
     Identity(
         username="admin",
@@ -93,8 +93,8 @@ IDENTITIES: tuple[Identity, ...] = (
         last_name="Admin",
         groups=(),
         realm_roles=("admin",),
-        password_env="PANOPTICON_TEST_PORTAL_ADMIN_PASSWORD",
-        kv_secret="panopticon-test-portal-admin-password",
+        password_env="SPANOPTICON_TEST_PORTAL_ADMIN_PASSWORD",
+        kv_secret="spanopticon-test-portal-admin-password",
         operator_claims=(
             "operator:console",
             "operator:support",

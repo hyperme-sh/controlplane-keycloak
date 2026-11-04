@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from account_types import AMR_MAPPER, AccountTypeError, ensure_mapper
 
-FLOW = "panopticon-connect-browser-v1"
+FLOW = "spanopticon-connect-browser-v1"
 CLIENT = "auth-connect-introspection"
 FRONTEND = "controlplane-frontend"
 LOA = "conditional-level-of-authentication"

@@ -634,7 +634,7 @@
       "redirectUris": [
         "http://localhost:3000/*",
         "exp://*",
-        "com.fyberlabs.panopticon://*"
+        "com.fyberlabs.spanopticon://*"
       ],
       "webOrigins": [
         "*"
