@@ -5,7 +5,8 @@ and minor versions; patch numbers advance independently and must preserve their
 accepted API contracts. Existing package versions are retained until a qualified
 release is prepared; installing this workflow does not qualify those versions.
 
-`release-policy.json` identifies the owner and every owning package version file.
+`release-policy.json` names this component and the package version file the
+workflow checks.
 The pinned Spanopticon workflow checks this configuration on pull requests.
 Version changes or a `releases/candidate/release.json` submission also require
 release admission. Every tag push and manual release request requires admission.
@@ -27,48 +28,10 @@ Before attempting a release:
 4. Make successful admission and artifact/consumer validation automated
    prerequisites of the publisher for the exact release. Select the accepted
    baseline independently of candidate data and retain the validation evidence.
-   This is pipeline validation, not a branch protection or human approval rule.
 
 Missing baselines fail closed. This workflow neither publishes nor deploys and
 does not enable repository Actions, grant private dependency access, or prove
 that a declared artifact exists. See the [Spanopticon release policy](https://github.com/hyperme-sh/spanopticon/blob/main/docs/releases.md)
-for the manifest format and compatibility rules.
-
-Do not add required reviewers, branch protections, approval rulesets, environment
-approvals, CODEOWNERS approval requirements, or release/deployment approval gates
-unless the user explicitly requests that specific change. This includes production
-releases. Automated tests and advisory reviews are welcome; human approval
-prerequisites are not. GitHub plan upgrades are not release-adoption prerequisites.
-
-## Test qualification and stable acceptance
-
-GitHub `test-<commit>` prereleases are development snapshots. Their embedded
-package version does not reserve a stable version. Artifact and consumer evidence
-belongs under `releases/qualification`. Owning-package and artifact validation
-remain separate from stable release admission. Future test receipts must carry
-an explicit non-stable classification.
-
-`releases/accepted` and `SPANOPTICON_RELEASE_BASELINE_SHA` are reserved for an
-actual immutable stable GitHub release. The pinned shared guard verifies the live
-release channel, stable tag source and asset digests; a test snapshot cannot
-become accepted through a provenance label. No stable baseline is recorded until
-that release exists. Stable publication remains closed without a valid baseline;
-first stable bootstrap and coordinated release qualification remain separate.
-No stable version, approval prerequisite or deployment is introduced here.
-
-
-### Published stable distribution
-
-The accepted record binds the existing immutable `v0.24.1` release to its actual
-GitHub release ID, source revision and published asset digests. Test snapshots
-remain under `releases/qualification` and do not establish stable acceptance.
-Runtime deployment and coordinated consumer acceptance remain separate.
-
-### Actions qualification and stable publication
-
-Main merges and workflow completion do not publish GitHub test releases. Exact
-qualification files remain in Actions artifacts with finite retention. The pinned
-publisher independently verifies a real immutable stable baseline and refuses
-qualification snapshots, even if a caller job reports success. Existing valid
-stable records are retained; no release, version change, deployment or human
-approval prerequisite is introduced by this correction.
+for the manifest format and compatibility rules. How this repository's
+validation artifacts, qualification snapshots, and stable tag fit together is
+in [releasing.md](releasing.md).

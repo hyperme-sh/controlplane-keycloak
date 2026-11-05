@@ -1,207 +1,340 @@
-# Controlplane Keycloak tooling
+# controlplane-keycloak
 
-## Current version authority
+Keycloak realm configuration and reconciliation helpers for Hypermesh
+control-plane clients and identity brokers. The declaration is
+[`keycloak/import/controlplane-realm.json`](keycloak/import/controlplane-realm.json)
+(realm `controlplane`). The Python helpers beside it use the standard library,
+talk to the Keycloak Admin API, and bring a live realm in line with that
+declaration: public clients, Microsoft / GitHub / Google brokers, account
+classification, and the 18+ confirmation gate.
 
-Current development version: `0.1.0`. The services remain before the unreleased
-0.24.0 milestone. Earlier 0.24/1.0 preparation and publication notes below are
-historical and do not authorize those versions. Existing tags and historical
-artifacts remain untouched. Development uses exact source pins and rebuilt
-artifacts; no prior release is required. Version changes, tags and publication
-require the owner's explicit authorization to the agent.
+## Why
 
-Realm configuration and reconciliation helpers for controlplane clients and
-identity-provider brokers. The declaration is `keycloak/import/controlplane-realm.json`.
-The Python scripts use the standard library and run directly from `keycloak/`.
+Renters and hosts sign in to Hypermesh through one control-plane realm. The
+portal, the visor and CLI, and host setup each need a stable client, redirect,
+scope, and token claim. Keycloak startup import (`--import-realm`) creates a
+realm that is not already there and leaves an existing realm unchanged, so
+editing the JSON later does not update a running realm. These helpers are that
+update path. Broker client secrets stay in the operator's environment and are
+never written back into the repository.
 
-## Tools
+## How it works
 
-- `configure_idp_brokers.py`: reconcile broker configuration, frontend logout
-  settings and native, host-setup and s3r.ch clients.
-- `account_types.py`: protect administrator-owned human/service classification
-  and reconcile authentication-method claim mappers.
-- `hypermesh_native.py`, `hypermesh_host_setup.py`, `s3rch_web.py`: client
-  declarations and reconciliation helpers used by the broker script.
-- `idp_enterprise.py`: broker claim classification and mapper declarations.
-- `connect_issuer.py`: dedicated issuer client configuration helpers.
-- `test_registration.py`: explicitly selected test-environment registration policy.
-- `seed_pan_test_identities.py`: test identity provisioning helper.
+The realm file is the source of truth for clients, scopes, protocol mappers,
+realm roles, and groups. `configure_idp_brokers.py` is the reconcile entry
+point. It updates three public clients, then broker credentials and claim
+mappers, the portal logout allowlist, and the age-confirmation gate. Each
+client step reports its own error and the later steps still run. A second run
+updates the same Keycloak client id in place.
 
-Import the realm only into an explicitly selected environment. Keycloak skips
-an already existing realm during startup import; changing this file does not
-reconcile an existing realm. Administrative scripts write to the selected realm.
-Deployment owners supply `KEYCLOAK_INTERNAL_URL`, `KC_BOOTSTRAP_ADMIN_USERNAME`
-and `KC_BOOTSTRAP_ADMIN_PASSWORD` through their existing secret injection.
-Broker credentials use the `KC_IDP_*` variables declared in the scripts.
-The checked-in realm contains development defaults and broker placeholders;
-environment-specific credential provisioning belongs to the deployment owner.
+| Client | Role |
+| --- | --- |
+| `controlplane-frontend` | Public authorization-code + PKCE client for the control-plane portal. |
+| `hypermesh-native` | Public PKCE and device-code client for the Hypermesh visor and CLI. Redirect is `http://127.0.0.1/callback`. |
+| `hypermesh-host-setup` | Device-code client used to sign in while connecting a host. Consent required. Default scopes are `basic` and `email`. Token audience is this client. |
+| `s3rch-web` | Public authorization-code + PKCE client for [s3r.ch](https://s3r.ch). Consumers leave it outside the control-plane API client allowlist. |
+| `controlplane-mobile` | Public PKCE client for the Expo app. |
+| `controlplane-device` | Device-code client for a CLI or embedded sign-in. |
+| `controlplane-m2m` | Confidential client-credentials client. The checked-in secret is a development placeholder. |
+| `controlplane-api-key` | Public client id used as `azp` when the gateway exchanges an API key for a JWT. |
+| `auth-connect-introspection` | Confidential client for payout-session introspection. Applied only by the explicit test issuer step below. |
 
-Public clients use their declared scopes and redirect URIs. Host setup is a
-separate client with reduced scopes and audience; consuming services still
-check tenant membership and host authority. Account classification is an
-administrator binding, not proof derived from email, roles or authentication
-alone. Local self-registration remains disabled in the declaration.
+Realm roles `renter`, `host`, and `admin` are portal grants. Groups `/renter`
+and `/host` carry the matching realm roles. The portal and the visor client
+both map group membership to a `groups` claim with the full path (`/renter`,
+`/host`). Access tokens in the declaration live 300 seconds. The visor client
+keeps its own session caps (30 minutes idle, 10 hours max, device code 600
+seconds) and uses the realm access-token lifespan.
 
-## Development and CI
+Identity providers `microsoft`, `github`, and `google` are the login buttons.
+Microsoft is the generic OIDC broker with signature validation against
+Microsoft's JWKS. Mappers copy broker facts onto the user (`idp_provider`,
+`idp_org`, `idp_login`, `idp_account`, `idp_wids`) and session notes onto the
+access token (`login_provider`, `entra_tenant_id`, `entra_object_id`).
+[Spanopticon](https://github.com/hyperme-sh/spanopticon) stores which enterprise
+an organization belongs to. This repository copies the broker claim onto the
+user and leaves that binding alone.
 
-Install uv 0.11.26 and Python 3.13, then run:
+`account_types.py` keeps the user-profile attribute `account_type` (`human` or
+`service`) editable by an administrator only, and writes it onto tokens.
+Browser authenticators it knows (password, OTP, WebAuthn) get an
+authentication-method reference with a 300-second lifetime, on create and on
+update. Other authenticator settings are left as they are.
+
+`age_confirmation.py` enables Keycloak's terms required action as the 18+
+gate, with copy that states the age rule. Accepting stores
+`terms_and_conditions` as Unix seconds. The portal treats a missing timestamp
+as an unfinished sign-in. Accounts an administrator has classified as
+`service`, and Keycloak client service accounts, skip the page.
+
+`account_closure.py` plans, and with `--apply` provisions, two **disabled**
+confidential clients (`account-closure-reader`, `account-closure-worker`) for
+Spanopticon account closure. They use distinct secrets and narrow
+`realm-management` roles. The operator audience is
+`spanopticon-account-closure`. The realm role `account:close` is not granted
+by default.
+
+Administrative helpers prefer `KEYCLOAK_INTERNAL_URL`, then `KEYCLOAK_URL`,
+then `http://127.0.0.1:8081`. Whitespace and a trailing slash are stripped.
+`account_closure.py` is the exception: it requires `KEYCLOAK_INTERNAL_URL`
+and accepts only HTTPS or HTTP on localhost.
+
+## Practical use
+
+The helpers are not an installable library (`package = false` in
+`pyproject.toml`). Run them from a checkout with Python 3.13. They need a
+Keycloak you administer. Point them at a realm you mean to change.
+
+The declaration is a lab default: `sslRequired` is `none`, self-registration
+is off, `controlplane-m2m` ships with the placeholder secret
+`dev-m2m-client-secret-change-me`, and broker client ids fall back to
+`unset-*-client-id` until real values are supplied. Put TLS in front of any
+Keycloak that is not on your machine, and replace the placeholder secret
+before anything uses `controlplane-m2m`.
+
+### First import
+
+Startup import creates `controlplane` when that realm is absent. Copy the
+declaration into Keycloak's import directory and start Keycloak with
+`--import-realm`. On the usual distribution image that directory is
+`/opt/keycloak/data/import`.
+
+```sh
+mkdir -p /opt/keycloak/data/import
+cp keycloak/import/controlplane-realm.json /opt/keycloak/data/import/
+```
+
+Keycloak substitutes `${VAR:default}` in the imported file. For a Microsoft
+directory other than personal accounts, set `KC_IDP_MICROSOFT_ISSUERS` to the
+comma-separated exact issuer URLs
+(`https://login.microsoftonline.com/<directory-uuid>/v2.0`) before that first
+start, and set the matching `KC_IDP_MICROSOFT_*` client id, secret, and tenant.
+The file's default issuer is the personal-account issuer
+`https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0`.
+Use a directory UUID, not a domain name. Leave `/common/v2.0`, a wildcard, and
+an empty issuer unset: signature checks need an exact issuer list.
+
+After the realm exists, further changes go through the reconcile script.
+
+### Reconcile clients and brokers
+
+From the repository root:
+
+```sh
+export KEYCLOAK_INTERNAL_URL=http://127.0.0.1:8081
+export KC_BOOTSTRAP_ADMIN_USERNAME=admin
+export KC_BOOTSTRAP_ADMIN_PASSWORD='replace-me'
+
+# Leave a provider's pair empty to skip it.
+export KC_IDP_MICROSOFT_CLIENT_ID='replace-me'
+export KC_IDP_MICROSOFT_CLIENT_SECRET='replace-me'
+export KC_IDP_MICROSOFT_TENANT_ID=common
+export KC_IDP_MICROSOFT_ALLOWED_TENANT_IDS=''
+
+export KC_IDP_GITHUB_CLIENT_ID='replace-me'
+export KC_IDP_GITHUB_CLIENT_SECRET='replace-me'
+export KC_IDP_GOOGLE_CLIENT_ID='replace-me'
+export KC_IDP_GOOGLE_CLIENT_SECRET='replace-me'
+
+python3 keycloak/configure_idp_brokers.py
+```
+
+`KC_IDP_MICROSOFT_TENANT_ID` selects the Microsoft endpoint: `common`,
+`organizations`, `consumers`, or one directory UUID.
+`KC_IDP_MICROSOFT_ALLOWED_TENANT_IDS` is a comma-separated list of work
+directory UUIDs. With `common`, an empty list allows only Microsoft's
+personal-account tenant. `organizations` requires a non-empty work list.
+`consumers` allows only the personal-account tenant. Reconciliation replaces
+the issuer list from that policy.
+
+Exit 0 means the client steps and the age gate both applied. Exit 1 means a
+client or broker step failed and the age gate applied; the other client steps
+still ran. Missing administrator credentials, or a failure to obtain an admin
+token, also exit 1 and write nothing. Exit 2 means the age gate did not apply;
+treat that as a failed rollout even when clients were updated. Run the script
+again after fixing the cause. A rerun updates the existing client. Secrets stay
+out of the log.
+
+`KC_TEST_REGISTRATION=1` on that same command opens self-registration on the
+realm it is pointed at (email as username, email verification left off). Use
+that only on a disposable test realm. The declaration itself keeps
+registration closed, and the password grant on `controlplane-frontend` stays
+off.
+
+`PAYMENT_CONNECT_NATIVE_ISSUER_ENABLED=true`, together with
+`KC_TEST_REGISTRATION=1` and `AUTH_CONNECT_INTROSPECTION_CLIENT_SECRET`, runs
+the test-only payout issuer setup in `connect_issuer.py`. Empty and `false`
+skip that step. Any other value is an error. Leave the flag unset when you
+are only reconciling the portal and the brokers.
+
+### Account classification
+
+Classification is an administrator binding. It is not inferred from the email
+address, from realm roles, or from which broker was used.
+
+```sh
+export KEYCLOAK_INTERNAL_URL=http://127.0.0.1:8081
+export KC_BOOTSTRAP_ADMIN_USERNAME=admin
+export KC_BOOTSTRAP_ADMIN_PASSWORD='replace-me'
+
+python3 keycloak/account_types.py \
+  --human-user-id 00000000-0000-0000-0000-000000000000 \
+  --service-user-id 00000000-0000-0000-0000-000000000001
+```
+
+Arguments are Keycloak user UUIDs. Omit either flag to skip that kind. The
+same user cannot be passed as both.
+
+### Age confirmation on its own
+
+`configure_idp_brokers.py` already runs this step. To apply only the gate:
+
+```sh
+export KEYCLOAK_INTERNAL_URL=http://127.0.0.1:8081
+export KC_BOOTSTRAP_ADMIN_USERNAME=admin
+export KC_BOOTSTRAP_ADMIN_PASSWORD='replace-me'
+bash scripts/require-age-confirmation.sh
+```
+
+A non-zero status means the gate was not applied. People who already have no
+`terms_and_conditions` timestamp are asked on their next sign-in.
+
+### Disposable test users
+
+`seed_pan_test_identities.py` creates three accounts in `controlplane` for a
+lab realm: `renter` (group and role `renter`), `leaser` (group and role
+`host`), and `admin` (realm role `admin`, the portal support role). Passwords
+come from `SPANOPTICON_TEST_RENTER_PASSWORD`,
+`SPANOPTICON_TEST_LEASER_PASSWORD`, and
+`SPANOPTICON_TEST_PORTAL_ADMIN_PASSWORD`. Existing passwords are kept unless
+you pass `--rotate-passwords`. A failed or malformed credential read stops the
+seed. `--wait-seconds N` waits for Keycloak before seeding.
+
+```sh
+export KEYCLOAK_INTERNAL_URL=http://127.0.0.1:8081
+export KC_BOOTSTRAP_ADMIN_USERNAME=admin
+export KC_BOOTSTRAP_ADMIN_PASSWORD='replace-me'
+export SPANOPTICON_TEST_RENTER_PASSWORD='replace-me'
+export SPANOPTICON_TEST_LEASER_PASSWORD='replace-me'
+export SPANOPTICON_TEST_PORTAL_ADMIN_PASSWORD='replace-me'
+python3 keycloak/seed_pan_test_identities.py --wait-seconds 60
+```
+
+### Account-closure clients
+
+Without `--apply` the script prints a plan and does not log in:
+
+```sh
+python3 keycloak/account_closure.py
+```
+
+`--apply` creates the reader and worker clients disabled. They stay disabled,
+existing secrets stay in place, and the only operators are the user UUIDs you
+pass. Secrets are environment variables:
+
+```sh
+export KEYCLOAK_INTERNAL_URL=https://keycloak.example.com
+export KC_BOOTSTRAP_ADMIN_USERNAME=admin
+export KC_BOOTSTRAP_ADMIN_PASSWORD='replace-me'
+export ACCOUNT_CLOSURE_KEYCLOAK_REALM=controlplane
+export ACCOUNT_CLOSURE_KEYCLOAK_READER_SECRET='replace-me'
+export ACCOUNT_CLOSURE_KEYCLOAK_CLIENT_SECRET='replace-me'
+python3 keycloak/account_closure.py --apply \
+  --human-user-id 00000000-0000-0000-0000-000000000000
+```
+
+`--human-user-id` and `--service-user-id` are optional, repeatable, and must
+be exact user UUIDs that already carry the administrator-owned `account_type`.
+Drift on an existing closure client, mapper, scope, or secret fails the run.
+
+## How Hypermesh uses it
+
+Hypermesh renters lease capacity and hosts provide it. Both sign in to the
+control-plane portal, which is the public client `controlplane-frontend`
+(authorization code and PKCE, S256). In this declaration the login redirects
+and web origins are the test portal and local development:
+
+- `https://portal.test.hyperme.sh`, including
+  `https://portal.test.hyperme.sh/api/auth/callback` and
+  `https://portal.test.hyperme.sh/api/auth/callback/keycloak`
+- Next.js on `localhost:3000` and `127.0.0.1:3000`
+- Vite on `localhost:5173` and `127.0.0.1:5173`
+
+Post-logout redirects, reconciled on every broker run, are
+`https://portal.hyperme.sh/signed-out`,
+`https://portal.test.hyperme.sh/signed-out`, and the same path on local port
+3000.
+
+A person opens the portal, picks Microsoft, GitHub, or Google, and returns to
+Keycloak. The 18+ terms page runs before Keycloak issues the authorization
+code, so a declined or skipped confirmation never becomes a portal session.
+The portal then calls the control plane with that access token. The `groups`
+claim tells the portal which surface to open: `/renter` for checkout and
+leases (realm role `renter`), `/host` for host status and sell state (realm
+role `host`). An administrator assigns those groups. Realm role `admin` is
+portal support and is separate from the Keycloak bootstrap administrator
+(`KC_BOOTSTRAP_ADMIN_*`). The same `groups` claim is on `hypermesh-native`, so
+the visor and CLI can switch tenant with the same membership.
+
+Connecting a machine is a second client. Host setup uses the device
+authorization grant on `hypermesh-host-setup` ("Sign in to connect a host").
+The access token's audience is that client, and the scopes are `basic` and
+`email`. Approval of the host still happens in the dashboard. Callers that
+accept the token continue to check tenant membership and host authority.
+
+The visor and CLI use `hypermesh-native`: loopback redirect
+`http://127.0.0.1/callback`, PKCE, and the device-code grant. That client is
+how an operator on the machine authenticates to the control plane without a
+browser session at the portal origin.
+
+Broker claim mappers are what the control plane reads to tell a personal
+login from an organization directory (Microsoft tenant id, Google hosted
+domain, GitHub login and org). Spanopticon keeps the enterprise binding.
+`account_type=service` is how automation passes the age check; a person
+cannot get that value by choosing a username.
+
+`s3rch-web` is the OAuth client for s3r.ch
+(`/api/identity/oauth/callback` on `s3r.ch`, `www.s3r.ch`, `test.s3r.ch`, and
+local Next.js). The renter and host portal uses `controlplane-frontend`.
+
+## Develop and test
+
+Install [uv](https://docs.astral.sh/uv/) 0.11.26 and Python 3.13, then from
+the repository root:
 
 ```sh
 bash scripts/check-tooling.sh
 ```
 
-The frozen tooling lock supplies pytest. Checks compile all Python helpers,
-run offline realm/client/classification tests, build a standalone source archive,
-verify every archive member against the checkout and rerun tests from its
-extracted contents. The archive keeps `keycloak/`, tests and development files.
-CI uses read-only repository permissions and debrunners. Both runs must execute
-the same nonempty test inventory with no skips; JUnit evidence is retained.
+That script checks `uv.lock`, compiles `keycloak/`, runs pytest (locked at
+9.2.0; the dev dependency is `pytest>=8.4.0`) over `tests/` and
+`tests_tools/`, builds `controlplane-keycloak.tar.gz`, checks every archive
+member against the checkout, and runs the same tests from the extracted
+archive. Both runs must execute the same non-empty test set with no skips.
 
-Offline checks use fake admin APIs. They do not validate live Keycloak tokens,
-broker login, real client reconciliation, deployment or dependent service policy.
-The identity-seed service integration and live account/issuer suites require
-separate service dependencies and a disposable Keycloak environment.
+The tests use fake Admin APIs. A green run checks the declaration, the
+helpers, and the archive. Live broker login and the identity seed need a
+disposable Keycloak and the environment variables above.
 
-## Administrative endpoint and identity policies
+Pull requests and pushes to `main` run
+[`.github/workflows/tooling.yml`](.github/workflows/tooling.yml), which is
+that script. JUnit and the contract evidence are kept as the `test-evidence`
+artifact for 30 days. On `main`, the validated archive is the `tested-dist`
+artifact for 90 days.
+[`.github/workflows/version-policy.yml`](.github/workflows/version-policy.yml)
+checks the version recorded for `pyproject.toml`.
 
-All administrative entry points prefer a nonblank `KEYCLOAK_INTERNAL_URL`, then
-accept legacy `KEYCLOAK_URL`, then default to `http://127.0.0.1:8081`. Whitespace
-and trailing slashes are normalized. Set the canonical variable for new deployments.
+## Release and versioning
 
-Microsoft uses the generic OIDC broker with exact issuer validation and Microsoft
-JWKS signature validation enabled. `common` endpoints support personal accounts
-and explicitly approved work directories. During reconciliation, set
-`KC_IDP_MICROSOFT_ALLOWED_TENANT_IDS` to a comma-separated list of work-directory
-UUIDs. An empty list permits only Microsoft's personal-account tenant. The
-`organizations` endpoint requires a nonempty work allowlist; `consumers` permits
-only the personal tenant. A specific tenant must be a UUID, not a domain alias.
-
-For first realm import, set `KC_IDP_MICROSOFT_ISSUERS` to the corresponding
-comma-separated exact issuer URLs (`https://login.microsoftonline.com/<UUID>/v2.0`).
-Its default is the personal-account issuer. If selecting a specific tenant or
-work directories at import, configure both endpoints and issuers. Reconciliation
-replaces the issuer list from the UUID policy above. Never use `/common/v2.0`, a
-wildcard, or an empty issuer to bypass validation. Arbitrary unlisted work tenants
-are intentionally refused. These offline checks do not establish live broker login.
-
-Authenticator references have a 300-second lifetime from the completed
-authentication step, on both creation and update. Unrelated authenticator settings
-are retained; this does not manufacture an authentication-method claim.
-
-The test identity seed initializes passwords for new users and existing users
-without a password credential. Existing passwords remain unchanged unless
-`--rotate-passwords` is explicitly supplied. A failed or malformed credential
-inventory stops seeding instead of assuming that a password is missing.
-
-## Release channels
-
-Main validation retains its exact qualified files in Actions artifacts. It does
-not create GitHub releases or tags. Historical `test-<commit>` prereleases remain
-qualification evidence and do not establish an accepted stable release.
-
-Stable publication requires an explicit `vMAJOR.MINOR.PATCH` tag, the exact
-successful main validation artifact, compatible declared contracts and an actual
-immutable stable baseline. The publisher independently verifies that evidence;
-successful caller jobs alone cannot establish acceptance. Missing evidence and
-first-stable bootstrap remain closed. Package qualification, coordinated consumer
-acceptance and runtime deployment remain separate.
-
-## Account closure provisioning
-
-`keycloak/account_closure.py` adopts the private closure tooling from Panopticon
-#671/#672. Its default invocation prints a plan without authenticating. An
-explicit `--apply` provisions **disabled** reader and worker clients with
-distinct secrets and narrowly scoped native management roles. It never enables
-these clients, rotates existing credentials, or selects operators automatically.
-
-Configuration uses `KEYCLOAK_INTERNAL_URL` (HTTPS or local loopback), the existing
-bootstrap administrator variables, `ACCOUNT_CLOSURE_KEYCLOAK_REALM` (default
-`controlplane`), `ACCOUNT_CLOSURE_KEYCLOAK_READER_SECRET`, and
-`ACCOUNT_CLOSURE_KEYCLOAK_CLIENT_SECRET`. Secrets belong in the deployment owner's
-secret injection, never command arguments or repository files. This tool requires
-the canonical endpoint explicitly; it does not fall back to `KEYCLOAK_URL`.
-
-Optional `--human-user-id` / `--service-user-id` arguments require exact native
-UUIDs and administrator-owned account classification. The separate operator
-audience is `spanopticon-account-closure`; ordinary clients and closure credentials
-do not become operators. The `account:close` realm role is not a default grant.
-Existing client, mapper, scope or credential drift fails for reconciliation.
-
-Offline tests cover input refusal, transport bounds, disabled credential policy,
-operator classification and default-grant rejection, from source and the verified
-archive. No deployed realm is contacted. Disposable native-provider and consuming
-identity-validator qualification remain in adoption issue #9; source behavior and
-offline tests alone do not establish deployment readiness.
-
-## Release qualification
-
-Tooling versions follow the shared 0.24 line. Archives use deterministic timestamps
-and ownership while preserving executable modes. The candidate digest binds the
-complete archive; compatibility inventory covers every realm/reconciliation file
-and mode under `keycloak/`. Source and extracted-archive fake-admin consumers must
-pass before publication. Admin modules are inspected without import during contract
-export. Offline tests do not authorize or establish deployed realm changes, identity
-provider readiness or installer/dependency metadata compatibility.
-
-## Transferred authentication realm contracts
-
-The standalone suite includes the introspection-client, split test-identity and
-password-grant restrictions transferred from Panopticon
-`d6d9541b72db2eb3f86cb8aedc071794eba116e3` auth tests. They inspect this owner's
-realm and seed tooling. Auth runtime cases run in auth-service; the frontend
-portal-grant assertions run in controlplane-portal. These are local contract
-tests, not live identity-provider acceptance.
-
-## Test qualification and stable acceptance
-
-GitHub `test-<commit>` prereleases are development snapshots. Their embedded
-package version does not reserve a stable version. Artifact and consumer evidence
-belongs under `releases/qualification`. Owning-package and artifact validation
-remain separate from stable release admission. Future test receipts must carry
-an explicit non-stable classification.
-
-`releases/accepted` and `SPANOPTICON_RELEASE_BASELINE_SHA` are reserved for an
-actual immutable stable GitHub release. The pinned shared guard verifies the live
-release channel, stable tag source and asset digests; a test snapshot cannot
-become accepted through a provenance label. No stable baseline is recorded until
-that release exists. Stable publication remains closed without a valid baseline;
-first stable bootstrap and coordinated release qualification remain separate.
-No stable version, approval prerequisite or deployment is introduced here.
-
-
-### Published stable distribution
-
-The accepted record binds the existing immutable `v0.24.1` release to its actual
-GitHub release ID, source revision and published asset digests. Test snapshots
-remain under `releases/qualification` and do not establish stable acceptance.
-Runtime deployment and coordinated consumer acceptance remain separate.
-
-### Actions qualification and stable publication
-
-Main merges and workflow completion do not publish GitHub test releases. Exact
-qualification files remain in Actions artifacts with finite retention. The pinned
-publisher independently verifies a real immutable stable baseline and refuses
-qualification snapshots, even if a caller job reports success. Existing valid
-stable records are retained; no release, version change, deployment or human
-approval prerequisite is introduced by this correction.
-
-## Age-confirmation ownership
-
-The offline age-confirmation and classification regressions are transferred from
-Panopticon `2cd00fd9a7ebb950999571a81be7cb0a24d9264e`; source hashes and
-adaptations are recorded in `tests/panopticon-age-transfer-provenance.json`.
-The realm, reconciliation helper and native mapper contract include the
-administrator-owned confirmation timestamp. Classification refreshes pending
-actions, and the broker entry point returns exit 2 if age reconciliation fails.
-The standalone `scripts/require-age-confirmation.sh` invokes the same helper.
-Existing issuer restrictions, bounded AMR lifetime and admin-endpoint precedence
-remain enforced. Offline tests block network access except their own loopback
-transport fixture. No deployed realm has been reconciled by this transfer.
-
-This verifies tooling behavior and archive completeness, not live login or portal
-acceptance. Operational seeds, public installation defaults and final deployment
-artifacts still require the core release review.
+This checkout's project is `controlplane-keycloak-checks` **0.1.0**
+(`pyproject.toml`), on release line `0.1` (`release-policy.json`). Day-to-day
+pushes archive that tree in Actions and do not publish a GitHub release. The
+immutable stable release recorded for this repository is
+[v0.24.1](https://github.com/hyperme-sh/controlplane-keycloak/releases/tag/v0.24.1).
+How qualification snapshots, the stable tag, and the publisher relate is in
+[docs/releasing.md](docs/releasing.md).
 
 ## License
 
-First-party tooling is [Apache-2.0](LICENSE). The standalone archive includes the
-exact license text and SPDX metadata; dependencies retain their own licenses.
+First-party tooling is [Apache-2.0](LICENSE). The source archive includes
+that license text. The development dependency (pytest) keeps its own license.
