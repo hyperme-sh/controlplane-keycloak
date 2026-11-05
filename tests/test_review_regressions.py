@@ -29,6 +29,7 @@ def test_all_admin_entrypoints_use_the_same_endpoint(monkeypatch, canonical, leg
     seen = []
     monkeypatch.setattr(brokers, 'admin_token', lambda base, *args: seen.append(base) or 'fake-token')
     monkeypatch.setattr(brokers, 'apply_realm_updates', lambda admin: 0)
+    monkeypatch.setattr(brokers, 'ensure_age_confirmation', lambda admin: None)
     monkeypatch.setattr(accounts, 'configure', lambda admin: None)
     monkeypatch.setattr(seed, 'require_passwords', lambda: {})
     monkeypatch.setattr(seed, 'seed', lambda **kwargs: seen.append(kwargs['base_url']) or {})

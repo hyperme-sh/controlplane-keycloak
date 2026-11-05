@@ -23,7 +23,10 @@
     "totpAppFreeOTPName"
   ],
   "webAuthnPolicyRpEntityName": "Control Plane",
-  "webAuthnPolicySignatureAlgorithms": ["ES256", "RS256"],
+  "webAuthnPolicySignatureAlgorithms": [
+    "ES256",
+    "RS256"
+  ],
   "webAuthnPolicyRpId": "",
   "webAuthnPolicyAttestationConveyancePreference": "not specified",
   "webAuthnPolicyAuthenticatorAttachment": "not specified",
@@ -33,7 +36,10 @@
   "webAuthnPolicyAvoidSameAuthenticatorRegister": false,
   "webAuthnPolicyAcceptableAaguids": [],
   "webAuthnPolicyPasswordlessRpEntityName": "Control Plane",
-  "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256", "RS256"],
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": [
+    "ES256",
+    "RS256"
+  ],
   "webAuthnPolicyPasswordlessRpId": "",
   "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
   "webAuthnPolicyPasswordlessAuthenticatorAttachment": "not specified",
@@ -54,10 +60,10 @@
     },
     {
       "alias": "TERMS_AND_CONDITIONS",
-      "name": "Terms and Conditions",
+      "name": "Age confirmation (18+)",
       "providerId": "TERMS_AND_CONDITIONS",
-      "enabled": false,
-      "defaultAction": false,
+      "enabled": true,
+      "defaultAction": true,
       "priority": 20,
       "config": {}
     },
@@ -373,12 +379,16 @@
     {
       "name": "renter",
       "path": "/renter",
-      "realmRoles": ["renter"]
+      "realmRoles": [
+        "renter"
+      ]
     },
     {
       "name": "host",
       "path": "/host",
-      "realmRoles": ["host"]
+      "realmRoles": [
+        "host"
+      ]
     }
   ],
   "clients": [
@@ -611,7 +621,8 @@
             "aggregate.attrs": "false",
             "id.token.claim": "true",
             "access.token.claim": "true",
-            "userinfo.token.claim": "false"
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
           }
         },
         {
@@ -622,6 +633,22 @@
           "config": {
             "id.token.claim": "true",
             "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "terms_and_conditions",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "terms_and_conditions",
+            "claim.name": "terms_and_conditions",
+            "jsonType.label": "long",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
           }
         }
       ]
@@ -647,7 +674,42 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "account_type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "account_type",
+            "claim.name": "account_type",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "aggregate.attrs": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "terms_and_conditions",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "terms_and_conditions",
+            "claim.name": "terms_and_conditions",
+            "jsonType.label": "long",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "controlplane-device",
@@ -665,7 +727,42 @@
       "attributes": {
         "oauth2.device.authorization.grant.enabled": "true",
         "pkce.code.challenge.method": "S256"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "account_type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "account_type",
+            "claim.name": "account_type",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "aggregate.attrs": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "terms_and_conditions",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "terms_and_conditions",
+            "claim.name": "terms_and_conditions",
+            "jsonType.label": "long",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "controlplane-m2m",
@@ -869,6 +966,39 @@
             "id.token.claim": "false",
             "userinfo.token.claim": "false"
           }
+        },
+        {
+          "name": "account_type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "account_type",
+            "claim.name": "account_type",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "aggregate.attrs": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "terms_and_conditions",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "terms_and_conditions",
+            "claim.name": "terms_and_conditions",
+            "jsonType.label": "long",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
         }
       ]
     },
@@ -1028,7 +1158,8 @@
       "lastName": "Fyberlabs",
       "requiredActions": [
         "UPDATE_PASSWORD",
-        "CONFIGURE_TOTP"
+        "CONFIGURE_TOTP",
+        "TERMS_AND_CONDITIONS"
       ],
       "attributes": {
         "account_type": [
@@ -1047,7 +1178,9 @@
       "groups": [
         "/renter"
       ],
-      "realmRoles": ["renter"],
+      "realmRoles": [
+        "renter"
+      ],
       "attributes": {
         "account_type": [
           "service"
@@ -1065,7 +1198,9 @@
       "groups": [
         "/host"
       ],
-      "realmRoles": ["host"],
+      "realmRoles": [
+        "host"
+      ],
       "attributes": {
         "account_type": [
           "service"
@@ -1099,10 +1234,25 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"account_type\",\"displayName\":\"Account type (administrator verified)\",\"validations\":{\"options\":{\"options\":[\"human\",\"service\"]}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"account_type\",\"displayName\":\"Account type (administrator verified)\",\"validations\":{\"options\":{\"options\":[\"human\",\"service\"]}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"terms_and_conditions\",\"displayName\":\"Age confirmed at (Unix seconds)\",\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"validations\":{\"pattern\":{\"pattern\":\"^[1-9][0-9]*$\"}},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"
           ]
         }
       }
     ]
+  },
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "en"
+  ],
+  "defaultLocale": "en",
+  "localizationTexts": {
+    "en": {
+      "termsTitle": "Confirm you are at least 18",
+      "termsText": "<p>Portal accounts are for people who are at least 18 years old.</p><p>Choose I'm at least 18 only if that is true. If you are under 18, decline. Without this confirmation the account cannot sign in.</p>",
+      "doAccept": "I'm at least 18",
+      "doDecline": "I'm under 18",
+      "acceptTerms": "I'm at least 18",
+      "termsAcceptanceRequired": "You must confirm that you are at least 18."
+    }
   }
 }

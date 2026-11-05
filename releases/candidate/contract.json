@@ -7,15 +7,19 @@
     },
     "keycloak/account_types.py": {
       "mode": 420,
-      "sha256": "78bb556b6718b014eee2fa5839b2bc98b030d69edc352dd814b905f76fc99ad6"
+      "sha256": "34e848476791ffac44d4a150e57a0f4dda4190da77f24f6686a085bd62d086cd"
     },
     "keycloak/admin_endpoint.py": {
       "mode": 420,
       "sha256": "a0a17108b0fb9b14ea83e00b7f4470ffff2d04c5fcb6939ca031dc6fb8ec2cf5"
     },
+    "keycloak/age_confirmation.py": {
+      "mode": 420,
+      "sha256": "dbf68af5f8ee2904106b6d6a3c47ef5dd42cb67db8125f595047bcd866a9b21c"
+    },
     "keycloak/configure_idp_brokers.py": {
       "mode": 420,
-      "sha256": "9669fc7e894b4ef16657a2ddb25b19b9d02306404e68d35278614ea48f9372aa"
+      "sha256": "714c2c03bce109a14077037cf2f4494836743252a4922565b9148cd8504859e0"
     },
     "keycloak/connect_issuer.py": {
       "mode": 420,
@@ -27,7 +31,7 @@
     },
     "keycloak/hypermesh_native.py": {
       "mode": 420,
-      "sha256": "870486de23c3922841b7ffd2eb6701f3cc770dcb4025c306212968549153997c"
+      "sha256": "c1cb996b4496e4ea20fb434d1d201a9524074ba2115d3fe0f80a9f4e33eff7e0"
     },
     "keycloak/idp_enterprise.py": {
       "mode": 420,
@@ -35,7 +39,7 @@
     },
     "keycloak/import/controlplane-realm.json": {
       "mode": 420,
-      "sha256": "0ad964f13ca1666e7c4fedc1d0f6279052b73ec1e7823f4037830b575835c43a"
+      "sha256": "0b4569d07b3ad62aeabad76d53667bb787acaee5e2f34ad5acdc24af9a34c19f"
     },
     "keycloak/s3rch_web.py": {
       "mode": 420,

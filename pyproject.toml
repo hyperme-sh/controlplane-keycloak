@@ -1,6 +1,8 @@
 [project]
 name = "controlplane-keycloak-checks"
 version = "0.1.0"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = []
 
@@ -12,3 +14,4 @@ package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["local_http: test creates its own loopback HTTP server"]

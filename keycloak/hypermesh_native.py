@@ -22,6 +22,7 @@ _KEYCLOAK_DIR = str(Path(__file__).resolve().parent)
 if _KEYCLOAK_DIR not in sys.path:
     sys.path.insert(0, _KEYCLOAK_DIR)
 
+from age_confirmation import ACCOUNT_TYPE_CLAIM_MAPPER, AGE_CLAIM_MAPPER
 from idp_enterprise import token_claim_mappers
 
 CLIENT_ID = "hypermesh-native"
@@ -99,13 +100,19 @@ def portal_groups_mapper(realm: dict[str, Any]) -> dict[str, Any]:
 
 
 def declared_protocol_mappers(realm: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    """Groups from the frontend client, then ``idp_*`` from ``token_claim_mappers``.
+    """Groups, IdP claims, account type, and the 18+ timestamp.
 
-    The live frontend client is updated from that same function. The realm
-    file must list the identical mappers so first import and refresh agree.
+    The realm file must list the same mappers so first import and refresh agree.
+    Account type lets automation pass the API age check. The timestamp is what
+    a person must present.
     """
     realm = load_realm() if realm is None else realm
-    return [portal_groups_mapper(realm), *token_claim_mappers()]
+    return [
+        portal_groups_mapper(realm),
+        *token_claim_mappers(),
+        ACCOUNT_TYPE_CLAIM_MAPPER,
+        AGE_CLAIM_MAPPER,
+    ]
 
 
 def validate_declared_client(client: dict[str, Any], realm: dict[str, Any] | None = None) -> None:
@@ -151,7 +158,7 @@ def validate_declared_client(client: dict[str, Any], realm: dict[str, Any] | Non
     if client.get("protocolMappers") != expected:
         raise NativeClientError(
             f"{CLIENT_ID} protocol mappers must be the portal groups mapper "
-            "plus idp_enterprise.token_claim_mappers()"
+            "plus idp_enterprise.token_claim_mappers(), account type and age confirmation"
         )
 
 
