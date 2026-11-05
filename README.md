@@ -133,3 +133,12 @@ and mode under `keycloak/`. Source and extracted-archive fake-admin consumers mu
 pass before publication. Admin modules are inspected without import during contract
 export. Offline tests do not authorize or establish deployed realm changes, identity
 provider readiness or installer/dependency metadata compatibility.
+
+## Transferred authentication realm contracts
+
+The standalone suite includes the introspection-client, split test-identity and
+password-grant restrictions transferred from Panopticon
+`d6d9541b72db2eb3f86cb8aedc071794eba116e3` auth tests. They inspect this owner's
+realm and seed tooling. Auth runtime cases run in auth-service; the frontend
+portal-grant assertions run in controlplane-portal. These are local contract
+tests, not live identity-provider acceptance.
