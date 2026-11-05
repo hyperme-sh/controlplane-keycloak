@@ -1,5 +1,14 @@
 # Controlplane Keycloak tooling
 
+## Current version authority
+
+Current development version: `0.1.0`. The services remain before the unreleased
+0.24.0 milestone. Earlier 0.24/1.0 preparation and publication notes below are
+historical and do not authorize those versions. Existing tags and historical
+artifacts remain untouched. Development uses exact source pins and rebuilt
+artifacts; no prior release is required. Version changes, tags and publication
+require the owner's explicit authorization to the agent.
+
 Realm configuration and reconciliation helpers for controlplane clients and
 identity-provider brokers. The declaration is `keycloak/import/controlplane-realm.json`.
 The Python scripts use the standard library and run directly from `keycloak/`.
