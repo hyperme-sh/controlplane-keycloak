@@ -137,7 +137,7 @@ def test_pan_test_identities_are_split_and_have_no_secrets() -> None:
     realm = _realm()
     roles = {r["name"] for r in realm["roles"]["realm"]}
     groups = {g["name"] for g in realm["groups"]}
-    assert roles == {"renter", "host", "admin"}
+    assert roles == {"renter", "host", "admin", "account:close"}
     assert groups == {"renter", "host"}
     assert "leaser" not in roles
     assert "leaser" not in groups

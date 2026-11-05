@@ -344,6 +344,12 @@
   "roles": {
     "realm": [
       {
+        "name": "account:close",
+        "description": "Explicit global native account-closure operator",
+        "composite": false,
+        "clientRole": false
+      },
+      {
         "name": "renter",
         "description": "Portal renter. Existing grant path for can_checkout / can_see_leases.",
         "composite": false,
