@@ -1,22 +1,13 @@
 {
+  "schema_version": 1,
   "repository": "hyperme-sh/controlplane-keycloak",
-  "revision": "772edd66c1ac2746823bb168ce2c3ae9cc8c814a",
-  "release_id": 434676399,
-  "immutable": true,
-  "tag": "test-772edd66c1ac2746823bb168ce2c3ae9cc8c814a",
-  "run_id": 41951786340,
-  "artifact_id": 13380978354,
+  "tag": "v0.24.1",
+  "revision": "c922a648fbdc4cc1e94a1c905b6558d8686821d1",
+  "release_id": 434692225,
   "assets": {
-    "controlplane-keycloak.tar.gz": "sha256:31ec50d02b68211fb39b104ed4037637af80a02a907279bf65cc3c3720efd2fa"
+    "controlplane-keycloak.tar.gz": "sha256:31ec50d02b68211fb39b104ed4037637af80a02a907279bf65cc3c3720efd2fa",
+    "release-manifest.json": "sha256:b9fd13776512640a546949d66bbbed2a23c9da5ae6c0f3a1df0aa65b53338da0"
   },
-  "published_release_url": "https://github.com/hyperme-sh/controlplane-keycloak/releases/tag/test-772edd66c1ac2746823bb168ce2c3ae9cc8c814a",
-  "checks": [
-    "successful same-repository main-push package run",
-    "live Actions artifact digest",
-    "release bytes equal tested bytes",
-    "immutable release and tag revision",
-    "asset digests equal manifest"
-  ],
-  "consumer_qualification": "107 source consumers, 15 tooling regressions and all 122 tests in extracted archive pass. Actual published archive runs its own complete check-tooling.sh successfully outside the checkout.",
-  "limitations": "Fake admin API and realm declaration qualification only; no deployed realm, identity provider or credential acceptance."
+  "published_release_url": "https://github.com/hyperme-sh/controlplane-keycloak/releases/tag/v0.24.1",
+  "qualification": "Existing immutable stable distribution; runtime deployment and coordinated consumer acceptance remain separate."
 }
