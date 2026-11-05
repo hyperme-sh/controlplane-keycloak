@@ -1,0 +1,20 @@
+{
+  "repository": "hyperme-sh/controlplane-keycloak",
+  "revision": "94bb214ccfb0e79123808a2f15c1c35628238683",
+  "release_id": 434633107,
+  "immutable": true,
+  "tag": "test-94bb214ccfb0e79123808a2f15c1c35628238683",
+  "run_id": 41943817889,
+  "artifact_id": 13378485257,
+  "assets": {
+    "controlplane-keycloak.tar.gz": "sha256:a1890f3e5d32909e6ebb38f6da4f10d36b6f7a11cf98295631f3cc9af60a17e1"
+  },
+  "published_release_url": "https://github.com/hyperme-sh/controlplane-keycloak/releases/tag/test-94bb214ccfb0e79123808a2f15c1c35628238683",
+  "checks": [
+    "successful same-repository main-push package run",
+    "live Actions artifact digest",
+    "release bytes equal tested bytes",
+    "immutable release and tag revision",
+    "asset digests equal manifest"
+  ]
+}

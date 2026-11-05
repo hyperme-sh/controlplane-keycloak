@@ -123,3 +123,13 @@ operator classification and default-grant rejection, from source and the verifie
 archive. No deployed realm is contacted. Disposable native-provider and consuming
 identity-validator qualification remain in adoption issue #9; source behavior and
 offline tests alone do not establish deployment readiness.
+
+## Release qualification
+
+Tooling versions follow the shared 0.24 line. Archives use deterministic timestamps
+and ownership while preserving executable modes. The candidate digest binds the
+complete archive; compatibility inventory covers every realm/reconciliation file
+and mode under `keycloak/`. Source and extracted-archive fake-admin consumers must
+pass before publication. Admin modules are inspected without import during contract
+export. Offline tests do not authorize or establish deployed realm changes, identity
+provider readiness or installer/dependency metadata compatibility.
