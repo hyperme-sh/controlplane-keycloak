@@ -21,6 +21,15 @@ jobs:
           version: '0.11.26'
           python-version: '3.13'
       - run: bash scripts/check-tooling.sh
+        env:
+          TEST_EVIDENCE_DIR: ${{ runner.temp }}/keycloak-test-evidence
+      - name: Retain matching source and archive test evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: test-evidence
+          path: ${{ runner.temp }}/keycloak-test-evidence/*
+          if-no-files-found: error
+          retention-days: 30
       - name: Retain validated package bytes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

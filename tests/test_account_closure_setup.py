@@ -84,6 +84,7 @@ def test_realm_declares_no_automatic_closure_operator_grants():
         assert setup.ROLE not in user.get("realmRoles", [])
 
 
+@pytest.mark.local_http
 def test_private_transport_refuses_redirects_proxies_malformed_and_oversize_bodies(monkeypatch):
     paths = []
 

@@ -253,7 +253,7 @@ def test_hypermesh_native_client_contract() -> None:
     frontend = next(item for item in realm["clients"] if item["clientId"] == "controlplane-frontend")
     frontend_groups = next(item for item in frontend["protocolMappers"] if item["name"] == "groups")
     assert client["protocolMappers"][0] == frontend_groups
-    assert client["protocolMappers"][1:] == module.token_claim_mappers()
+    assert client["protocolMappers"][1:] == [*module.token_claim_mappers(), module.ACCOUNT_TYPE_CLAIM_MAPPER, module.AGE_CLAIM_MAPPER]
     assert client["protocolMappers"] == module.declared_protocol_mappers(realm)
     assert _realm()["accessTokenLifespan"] == 300
 
@@ -416,7 +416,7 @@ def test_hypermesh_native_upsert_is_idempotent() -> None:
         "/clients/native-1/optional-client-scopes/microprofile-jwt",
         "/clients/native-1/optional-client-scopes/offline",
     }
-    assert len(admin.mapper_posts) == 9
+    assert len(admin.mapper_posts) == 11
     assert admin.mapper_deletes == []
 
     default_names = {item["name"] for item in admin.assigned["native-1"]["default"]}

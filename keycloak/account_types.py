@@ -32,6 +32,7 @@ HUMAN_MAPPER = {
         "jsonType.label": "String", "multivalued": "false",
         "aggregate.attrs": "false", "id.token.claim": "true",
         "access.token.claim": "true", "userinfo.token.claim": "false",
+        "introspection.token.claim": "true",
     },
 }
 SERVICE_MAPPER = {
@@ -151,8 +152,17 @@ def classify(admin, user_id, account_type):
         raise AccountTypeError("A client service account cannot be classified as human")
     attributes = {**(current.get("attributes") or {}), "account_type": [account_type]}
     admin.put("/users/" + user_id, {**current, "attributes": attributes})
-    if (admin.get("/users/" + user_id).get("attributes") or {}).get("account_type") != [account_type]:
+    verified = admin.get("/users/" + user_id)
+    if (verified.get("attributes") or {}).get("account_type") != [account_type]:
         raise AccountTypeError("Account classification verification failed")
+    keycloak_dir = str(Path(__file__).resolve().parent)
+    if keycloak_dir not in sys.path:
+        sys.path.insert(0, keycloak_dir)
+    from age_confirmation import AgeConfirmationError, apply_user_age_gate
+    try:
+        apply_user_age_gate(admin, verified)
+    except AgeConfirmationError as exc:
+        raise AccountTypeError(str(exc)) from None
 
 
 def main(argv=None):

@@ -1,0 +1,55 @@
+{
+  "repository": "FyberLabs/panopticon",
+  "commit": "2cd00fd9a7ebb950999571a81be7cb0a24d9264e",
+  "files": [
+    {
+      "source": "infra/keycloak/age_confirmation.py",
+      "destination": "keycloak/age_confirmation.py",
+      "sha256": "c6884fc4569cc5ff3560930b8c1d1bc8d144ba0c9ddb8f114e520ea2cb2326f0"
+    },
+    {
+      "source": "core/auth-service/tests/test_age_confirmation.py",
+      "destination": "tests/test_age_confirmation.py",
+      "sha256": "c0d774e53162bf276b512f3ffc4978c2964fce2e632d61df6b133e9a5b33c5d0"
+    },
+    {
+      "source": "scripts/require-age-confirmation.sh",
+      "destination": "scripts/require-age-confirmation.sh",
+      "sha256": "125cbdc90199925be8f7fe417f766f4ab702d4d06dd4276a89fe56cd7ee034ef"
+    },
+    {
+      "source": "core/auth-service/tests/test_account_types.py",
+      "destination": "tests/test_account_types.py",
+      "sha256": "436dbe723e34c17d305c4cd397a1104d2decc2bc78c53029ebcb61453f0353f1"
+    },
+    {
+      "source": "infra/keycloak/hypermesh_native.py",
+      "destination": "keycloak/hypermesh_native.py",
+      "sha256": "c95a7b07e0ac91bda611325cf8b85e0ab6a9cf93de9b9bf0db49fec3ae939bd7"
+    },
+    {
+      "source": "infra/keycloak/account_types.py",
+      "destination": "keycloak/account_types.py",
+      "sha256": "7aa2e932bec50e5b2bf98e50aeeb91bdb3df127d4be0579873cad47777844c79",
+      "adaptation": "Adopt only age-related changes; retain newer owner security and client configuration."
+    },
+    {
+      "source": "infra/keycloak/configure_idp_brokers.py",
+      "destination": "keycloak/configure_idp_brokers.py",
+      "sha256": "189d00dbd450ad7a573597daab90bf6fe1efb5427405c4d36fc2aded962458b2",
+      "adaptation": "Adopt only age-related changes; retain newer owner security and client configuration."
+    },
+    {
+      "source": "infra/keycloak/import/controlplane-realm.json",
+      "destination": "keycloak/import/controlplane-realm.json",
+      "sha256": "35f4a8da03d70b67acdfd0917408a4b43ccf971741a3f2696b88bba19924d52b",
+      "adaptation": "Adopt only age-related changes; retain newer owner security and client configuration."
+    }
+  ],
+  "adaptations": [
+    "Standalone paths; shared admin_endpoint precedence retained.",
+    "Apply only age-confirmation realm/action/profile/mappers and classification hooks; preserve owner issuer allowlists, AMR expiry, client restrictions and existing tests.",
+    "No live administrative endpoint invoked.",
+    "Retain owner native mapper validation and add account type/age mappers; offline tests reject all socket and urllib network access."
+  ]
+}

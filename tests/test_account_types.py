@@ -106,3 +106,28 @@ def test_realm_import_classifies_people_and_shared_automation_separately():
             assert accounts.AMR_MAPPER in client["protocolMappers"]
         elif client.get("serviceAccountsEnabled"):
             assert accounts.SERVICE_MAPPER in client["protocolMappers"]
+
+
+def test_classification_updates_the_age_gate_with_the_account_type():
+    admin = Admin()
+    service_id = str(uuid.uuid4())
+    admin.users[service_id] = {
+        "id": service_id,
+        "username": "automation",
+        "attributes": {},
+        "requiredActions": ["TERMS_AND_CONDITIONS"],
+    }
+    accounts.classify(admin, service_id, "service")
+    assert admin.users[service_id]["attributes"]["account_type"] == ["service"]
+    assert admin.users[service_id]["requiredActions"] == []
+
+    human_id = str(uuid.uuid4())
+    admin.users[human_id] = {
+        "id": human_id,
+        "username": "ada@example.com",
+        "attributes": {"account_type": ["service"]},
+        "requiredActions": [],
+    }
+    accounts.classify(admin, human_id, "human")
+    assert admin.users[human_id]["attributes"]["account_type"] == ["human"]
+    assert "TERMS_AND_CONDITIONS" in admin.users[human_id]["requiredActions"]

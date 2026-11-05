@@ -3,11 +3,14 @@ from pathlib import Path
 import sys
 import gzip
 import tarfile
+import tomllib
 
 root = Path(__file__).resolve().parents[1]
+project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
+assert project['license'] == 'Apache-2.0' and project['license-files'] == ['LICENSE']
 output = Path(sys.argv[1]).resolve()
 output.mkdir(parents=True, exist_ok=True)
-files = [root / name for name in ('README.md', 'AGENTS.md', 'pyproject.toml', 'uv.lock')]
+files = [root / name for name in ('LICENSE', 'README.md', 'AGENTS.md', 'pyproject.toml', 'uv.lock')]
 for folder in ('keycloak', 'tests', 'tests_tools', 'scripts'):
     files.extend(p for p in (root / folder).rglob('*')
                  if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')

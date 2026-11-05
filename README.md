@@ -53,7 +53,8 @@ The frozen tooling lock supplies pytest. Checks compile all Python helpers,
 run offline realm/client/classification tests, build a standalone source archive,
 verify every archive member against the checkout and rerun tests from its
 extracted contents. The archive keeps `keycloak/`, tests and development files.
-CI uses read-only repository permissions and disposable GitHub-hosted workers.
+CI uses read-only repository permissions and debrunners. Both runs must execute
+the same nonempty test inventory with no skips; JUnit evidence is retained.
 
 Offline checks use fake admin APIs. They do not validate live Keycloak tokens,
 broker login, real client reconciliation, deployment or dependent service policy.
@@ -182,3 +183,25 @@ publisher independently verifies a real immutable stable baseline and refuses
 qualification snapshots, even if a caller job reports success. Existing valid
 stable records are retained; no release, version change, deployment or human
 approval prerequisite is introduced by this correction.
+
+## Age-confirmation ownership
+
+The offline age-confirmation and classification regressions are transferred from
+Panopticon `2cd00fd9a7ebb950999571a81be7cb0a24d9264e`; source hashes and
+adaptations are recorded in `tests/panopticon-age-transfer-provenance.json`.
+The realm, reconciliation helper and native mapper contract include the
+administrator-owned confirmation timestamp. Classification refreshes pending
+actions, and the broker entry point returns exit 2 if age reconciliation fails.
+The standalone `scripts/require-age-confirmation.sh` invokes the same helper.
+Existing issuer restrictions, bounded AMR lifetime and admin-endpoint precedence
+remain enforced. Offline tests block network access except their own loopback
+transport fixture. No deployed realm has been reconciled by this transfer.
+
+This verifies tooling behavior and archive completeness, not live login or portal
+acceptance. Operational seeds, public installation defaults and final deployment
+artifacts still require the core release review.
+
+## License
+
+First-party tooling is [Apache-2.0](LICENSE). The standalone archive includes the
+exact license text and SPDX metadata; dependencies retain their own licenses.

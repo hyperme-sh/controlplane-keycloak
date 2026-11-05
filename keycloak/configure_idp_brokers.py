@@ -38,6 +38,7 @@ from idp_enterprise import (
     microsoft_endpoints,
     token_claim_mappers,
 )
+from age_confirmation import AgeConfirmationError, ensure_age_confirmation
 from test_registration import apply_test_registration
 
 REALM = "controlplane"
@@ -316,7 +317,14 @@ def main() -> int:
     if not username or not password:
         raise ConfigureError("missing KC_BOOTSTRAP_ADMIN_USERNAME or password")
     token = admin_token(base, username, password)
-    return apply_realm_updates(AdminClient(base, token))
+    admin = AdminClient(base, token)
+    status = apply_realm_updates(admin)
+    try:
+        ensure_age_confirmation(admin)
+    except (AgeConfirmationError, ConfigureError, urllib.error.URLError) as exc:
+        print(f"ERROR: age confirmation blocked rollout: {exc}", file=sys.stderr)
+        return 2
+    return status
 
 
 if __name__ == "__main__":
