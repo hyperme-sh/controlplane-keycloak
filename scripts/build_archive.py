@@ -1,6 +1,7 @@
 """Build and verify a standalone tooling archive without generated files."""
 from pathlib import Path
 import sys
+import gzip
 import tarfile
 
 root = Path(__file__).resolve().parents[1]
@@ -12,9 +13,15 @@ for folder in ('keycloak', 'tests', 'scripts'):
                  if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')
 expected = {p.relative_to(root).as_posix(): p for p in files}
 archive_path = output / 'controlplane-keycloak.tar.gz'
-with tarfile.open(archive_path, 'w:gz') as archive:
-    for name, path in sorted(expected.items()):
-        archive.add(path, arcname=name, recursive=False)
+with archive_path.open('wb') as output_file, gzip.GzipFile(filename='', mode='wb', fileobj=output_file, mtime=0) as compressed:
+    with tarfile.open(fileobj=compressed, mode='w', format=tarfile.USTAR_FORMAT) as archive:
+        for name, path in sorted(expected.items()):
+            info = archive.gettarinfo(str(path), arcname=name)
+            info.uid = info.gid = 0
+            info.uname = info.gname = ''
+            info.mtime = 0
+            with path.open('rb') as source:
+                archive.addfile(info, source)
 with tarfile.open(archive_path) as archive:
     members = archive.getmembers()
     assert len(members) == len(expected) and {m.name for m in members} == set(expected)
