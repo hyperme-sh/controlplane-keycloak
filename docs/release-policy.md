@@ -55,3 +55,11 @@ become accepted through a provenance label. No stable baseline is recorded until
 that release exists. Stable publication remains closed without a valid baseline;
 first stable bootstrap and coordinated release qualification remain separate.
 No stable version, approval prerequisite or deployment is introduced here.
+
+
+### Published stable distribution
+
+The accepted record binds the existing immutable `v0.24.1` release to its actual
+GitHub release ID, source revision and published asset digests. Test snapshots
+remain under `releases/qualification` and do not establish stable acceptance.
+Runtime deployment and coordinated consumer acceptance remain separate.

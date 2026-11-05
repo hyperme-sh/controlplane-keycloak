@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "line": "0.24",
+  "components": {
+    "controlplane-keycloak": {
+      "version": "0.24.1",
+      "contract": "contract.json",
+      "contract_sha256": "09d04d03eda5a1e10c0d0dd14e42bd10db976a97081e8acdce69e075fbf3f8f6",
+      "artifact": {
+        "kind": "package",
+        "uri": "urn:sha256:31ec50d02b68211fb39b104ed4037637af80a02a907279bf65cc3c3720efd2fa",
+        "sha256": "31ec50d02b68211fb39b104ed4037637af80a02a907279bf65cc3c3720efd2fa"
+      }
+    }
+  }
+}
