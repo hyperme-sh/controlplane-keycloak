@@ -8,7 +8,7 @@ root = Path(__file__).resolve().parents[1]
 output = Path(sys.argv[1]).resolve()
 output.mkdir(parents=True, exist_ok=True)
 files = [root / name for name in ('README.md', 'AGENTS.md', 'pyproject.toml', 'uv.lock')]
-for folder in ('keycloak', 'tests', 'scripts'):
+for folder in ('keycloak', 'tests', 'tests_tools', 'scripts'):
     files.extend(p for p in (root / folder).rglob('*')
                  if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')
 expected = {p.relative_to(root).as_posix(): p for p in files}

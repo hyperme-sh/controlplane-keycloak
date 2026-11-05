@@ -3,13 +3,13 @@
   "line": "0.24",
   "components": {
     "controlplane-keycloak": {
-      "version": "0.24.0",
+      "version": "0.24.1",
       "contract": "contract.json",
       "contract_sha256": "09d04d03eda5a1e10c0d0dd14e42bd10db976a97081e8acdce69e075fbf3f8f6",
       "artifact": {
         "kind": "package",
-        "uri": "urn:sha256:3c36500a6e45586cd9cd4b10739bf27c6dd03a709d676cf8e0d834b61f5efb78",
-        "sha256": "3c36500a6e45586cd9cd4b10739bf27c6dd03a709d676cf8e0d834b61f5efb78"
+        "uri": "urn:sha256:05355ebf5309378b9557e0daeae0530162f153c8ea0f671079a972520a2f839c",
+        "sha256": "05355ebf5309378b9557e0daeae0530162f153c8ea0f671079a972520a2f839c"
       }
     }
   }
