@@ -8,7 +8,7 @@ permissions:
   contents: read
 jobs:
   package:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, debrunner]
     timeout-minutes: 15
     steps:
       - name: Prepare release output
