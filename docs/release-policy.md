@@ -44,9 +44,9 @@ prerequisites are not. GitHub plan upgrades are not release-adoption prerequisit
 
 GitHub `test-<commit>` prereleases are development snapshots. Their embedded
 package version does not reserve a stable version. Artifact and consumer evidence
-lives under `releases/qualification`; the current wheel binding is still checked
-by package CI, alongside any future explicit stable candidate. Earlier test
-snapshot receipts are preserved there with an explicit non-stable classification.
+belongs under `releases/qualification`. Owning-package and artifact validation
+remain separate from stable release admission. Future test receipts must carry
+an explicit non-stable classification.
 
 `releases/accepted` and `SPANOPTICON_RELEASE_BASELINE_SHA` are reserved for an
 actual immutable stable GitHub release. The pinned shared guard verifies the live
@@ -63,3 +63,12 @@ The accepted record binds the existing immutable `v0.24.1` release to its actual
 GitHub release ID, source revision and published asset digests. Test snapshots
 remain under `releases/qualification` and do not establish stable acceptance.
 Runtime deployment and coordinated consumer acceptance remain separate.
+
+### Actions qualification and stable publication
+
+Main merges and workflow completion do not publish GitHub test releases. Exact
+qualification files remain in Actions artifacts with finite retention. The pinned
+publisher independently verifies a real immutable stable baseline and refuses
+qualification snapshots, even if a caller job reports success. Existing valid
+stable records are retained; no release, version change, deployment or human
+approval prerequisite is introduced by this correction.
