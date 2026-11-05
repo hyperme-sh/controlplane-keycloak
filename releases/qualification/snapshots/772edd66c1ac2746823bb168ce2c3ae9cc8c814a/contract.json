@@ -1,0 +1,54 @@
+{
+  "coverage": "complete Keycloak realm and reconciliation runtime bytes and modes; live realm acceptance is separate",
+  "packaged_files": {
+    "keycloak/account_closure.py": {
+      "mode": 420,
+      "sha256": "b717f4b01666d0186af339b9f2f3813d72030b453b675b484c9d674f583d4a5a"
+    },
+    "keycloak/account_types.py": {
+      "mode": 420,
+      "sha256": "78bb556b6718b014eee2fa5839b2bc98b030d69edc352dd814b905f76fc99ad6"
+    },
+    "keycloak/admin_endpoint.py": {
+      "mode": 420,
+      "sha256": "a0a17108b0fb9b14ea83e00b7f4470ffff2d04c5fcb6939ca031dc6fb8ec2cf5"
+    },
+    "keycloak/configure_idp_brokers.py": {
+      "mode": 420,
+      "sha256": "9669fc7e894b4ef16657a2ddb25b19b9d02306404e68d35278614ea48f9372aa"
+    },
+    "keycloak/connect_issuer.py": {
+      "mode": 420,
+      "sha256": "eafe7d78c070256a473280bd224448762ee3b845cab267c870858e33dd09b69d"
+    },
+    "keycloak/hypermesh_host_setup.py": {
+      "mode": 420,
+      "sha256": "1a5e9eaecf1d8605e109eb004974d08b61348fd6d2bb7f4425282073a52f4075"
+    },
+    "keycloak/hypermesh_native.py": {
+      "mode": 420,
+      "sha256": "870486de23c3922841b7ffd2eb6701f3cc770dcb4025c306212968549153997c"
+    },
+    "keycloak/idp_enterprise.py": {
+      "mode": 420,
+      "sha256": "9d4fc652f81fdc003eeb97db44e86b1b57a936cec3592f815604e73700f47108"
+    },
+    "keycloak/import/controlplane-realm.json": {
+      "mode": 420,
+      "sha256": "0ad964f13ca1666e7c4fedc1d0f6279052b73ec1e7823f4037830b575835c43a"
+    },
+    "keycloak/s3rch_web.py": {
+      "mode": 420,
+      "sha256": "d48cc5af4a1069b96280a3eeab973f212dbea2e06aa394f5b505aff670b7c40e"
+    },
+    "keycloak/seed_pan_test_identities.py": {
+      "mode": 420,
+      "sha256": "f511cbd23d170e4f7dee5726fb1fd8647108dd786aac916186ddf0f28dead00b"
+    },
+    "keycloak/test_registration.py": {
+      "mode": 420,
+      "sha256": "783f273b1e91f73848511273cac30ac4f12066c16d60dd56e5fd7d520236b6d8"
+    }
+  },
+  "schema_version": 1
+}
