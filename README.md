@@ -316,9 +316,20 @@ The tests use fake Admin APIs. A green run checks the declaration, the
 helpers, and the archive. Live broker login and the identity seed need a
 disposable Keycloak and the environment variables above.
 
+`bash scripts/check-native.sh` separately runs the transferred closure regression
+against a digest-pinned Keycloak 26.5 container. Docker is required; missing Docker
+fails this lane rather than skipping it. Each source/archive run creates its own
+realm with random credentials, binds HTTP only to an ephemeral loopback port and
+removes its container and anonymous volumes on exit. No configured realm or
+administrator credential is used. Signed tokens prove selected human/AI grants,
+disabled-by-default clients, protected internal subjects and actual reader/worker
+permissions. The native lane also uses immutable identity revision
+`5aeff3d2c00568f39ca6e8b75c7e63883d3a510b` to accept the selected human/AI
+tokens and reject the unselected human through the actual consumer validator.
+
 Pull requests and pushes to `main` run
 [`.github/workflows/tooling.yml`](.github/workflows/tooling.yml), which is
-that script. JUnit and the contract evidence are kept as the `test-evidence`
+both offline and native scripts. JUnit and the contract evidence are kept as the `test-evidence`
 artifact for 30 days. On `main`, the validated archive is the `tested-dist`
 artifact for 90 days.
 [`.github/workflows/version-policy.yml`](.github/workflows/version-policy.yml)

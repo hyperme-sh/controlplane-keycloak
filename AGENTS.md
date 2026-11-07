@@ -26,7 +26,10 @@ the same write credential; do not claim that they can.
 This repository owns the realm declaration and its reconciliation helpers.
 Keep client scopes, protected identity attributes, mapper ownership and failure
 behavior explicit. Run `bash scripts/check-tooling.sh` for offline checks.
-Tests must use fake admin APIs and must not call a deployed realm. Runtime admin
+Offline tests use fake admin APIs and must not call a deployed realm. The separate
+`bash scripts/check-native.sh` lane may create a digest-pinned disposable Docker
+realm bound only to loopback, using random fixture credentials and mandatory cleanup.
+It must not use configured providers or deployed administrator credentials. Runtime admin
 scripts require separately configured credentials and deployment authority.
 
 ## Package publication permission boundary

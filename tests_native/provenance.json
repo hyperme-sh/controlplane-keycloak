@@ -1,0 +1,11 @@
+{
+  "source_repository": "FyberLabs/panopticon",
+  "source_path": "core/auth-service/tests/test_account_closure_setup_native.py",
+  "source_sha256": "7913a04785f263f0b1a6c9276bde523ddf2645f37b02d1952de80c1ebcfb8dfc",
+  "adaptations": [
+    "Native owner paths",
+    "Digest-pinned disposable loopback-only Docker fixture; no skips",
+    "Pinned native controlplane-identity consumer verifies selected human/AI tokens and refuses unselected identities"
+  ],
+  "identity_revision": "5aeff3d2c00568f39ca6e8b75c7e63883d3a510b"
+}
