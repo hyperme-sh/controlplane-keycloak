@@ -8,6 +8,7 @@ dependencies = []
 
 [dependency-groups]
 dev = ["pytest>=8.4.0"]
+native = ["docker>=7.1.0", "httpx>=0.28.1", "pyjwt[crypto]>=2.10.1", "controlplane-identity @ git+https://github.com/hyperme-sh/controlplane-identity.git@5aeff3d2c00568f39ca6e8b75c7e63883d3a510b"]
 
 [tool.uv]
 package = false

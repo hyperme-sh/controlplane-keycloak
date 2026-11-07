@@ -16,7 +16,7 @@ def snapshot(path):
         names = [m.name for m in members]
         if len(names) != len(set(names)) or any(not m.isfile() or m.name.startswith('/') or '..' in PurePosixPath(m.name).parts for m in members):
             raise ValueError('Unsafe or duplicate archive member')
-        if any(n not in {'LICENSE', 'README.md', 'AGENTS.md', 'pyproject.toml', 'uv.lock'} and not n.startswith(('keycloak/', 'tests/', 'tests_tools/', 'scripts/')) for n in names):
+        if any(n not in {'LICENSE', 'README.md', 'AGENTS.md', 'pyproject.toml', 'uv.lock'} and not n.startswith(('keycloak/', 'tests/', 'tests_tools/', 'tests_native/', 'scripts/')) for n in names):
             raise ValueError('Unexpected tooling archive contents')
         if not {'pyproject.toml', 'keycloak/import/controlplane-realm.json', 'keycloak/admin_endpoint.py'} <= set(names):
             raise ValueError('Missing tooling identity or realm')
