@@ -5,11 +5,11 @@
     "controlplane-keycloak": {
       "version": "0.1.0",
       "contract": "contract.json",
-      "contract_sha256": "ac3ede5d47f09fa2ff94f2abe674201eef29bc91ff242a99cd533e09fbb1f7f1",
+      "contract_sha256": "9720a506504f38dacc0af343847219e5783c79e208f4b3f8a7ff60068cc5910f",
       "artifact": {
         "kind": "package",
-        "uri": "urn:sha256:cf089c28b94f60ec319433cec271d95f5fc799004e9646f45dec1c48183ebe8a",
-        "sha256": "cf089c28b94f60ec319433cec271d95f5fc799004e9646f45dec1c48183ebe8a"
+        "uri": "urn:sha256:bad493131729c2ba98583f5bc5831bfdbe0422a8638c03624f1827c7723483d8",
+        "sha256": "bad493131729c2ba98583f5bc5831bfdbe0422a8638c03624f1827c7723483d8"
       }
     }
   }
