@@ -169,6 +169,7 @@
         "clientAuthMethod": "client_secret_post",
         "clientId": "${KC_IDP_MICROSOFT_CLIENT_ID:unset-microsoft-client-id}",
         "clientSecret": "${KC_IDP_MICROSOFT_CLIENT_SECRET:unset-microsoft-client-secret}",
+        "prompt": "select_account",
         "authorizationUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/authorize",
         "tokenUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/token",
         "logoutUrl": "https://login.microsoftonline.com/${KC_IDP_MICROSOFT_TENANT_ID:common}/oauth2/v2.0/logout",

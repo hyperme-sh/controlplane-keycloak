@@ -57,6 +57,7 @@ def microsoft_endpoints(tenant: str | None, allowed_tenants: str = "") -> dict[s
         raise IdpMapError("Microsoft tenant configuration requires valid directory UUIDs and an explicit work allowlist") from exc
     base = f"https://login.microsoftonline.com/{chosen}"
     return {
+        "prompt": "select_account",
         "authorizationUrl": f"{base}/oauth2/v2.0/authorize",
         "tokenUrl": f"{base}/oauth2/v2.0/token",
         "logoutUrl": f"{base}/oauth2/v2.0/logout",

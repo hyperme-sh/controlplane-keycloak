@@ -35,11 +35,11 @@
     },
     "keycloak/idp_enterprise.py": {
       "mode": 420,
-      "sha256": "9d4fc652f81fdc003eeb97db44e86b1b57a936cec3592f815604e73700f47108"
+      "sha256": "5104ebfe03e0f88e0a0bb529882a42fe2507d7c218b199c5f8900ec00417abb4"
     },
     "keycloak/import/controlplane-realm.json": {
       "mode": 420,
-      "sha256": "0b4569d07b3ad62aeabad76d53667bb787acaee5e2f34ad5acdc24af9a34c19f"
+      "sha256": "161586988397a9ba7d3350f6bda1db6d2ce503560b2f03ae6e104fab0256ffbe"
     },
     "keycloak/s3rch_web.py": {
       "mode": 420,
