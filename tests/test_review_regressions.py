@@ -104,6 +104,7 @@ def test_microsoft_exact_issuer_policy(tenant, allowlist, accepted):
     assert issuers == {f'https://login.microsoftonline.com/{value}/v2.0' for value in accepted}
     assert f'https://login.microsoftonline.com/{OTHER}/v2.0' not in issuers
     assert 'https://evil.example/' not in issuers
+    assert config['prompt'] == 'select_account'
     assert config['validateSignature'] == config['useJwksUrl'] == 'true'
 
 
@@ -116,6 +117,7 @@ def test_realm_import_default_matches_reconciler_personal_issuer():
     realm = json.loads((ROOT / 'keycloak/import/controlplane-realm.json').read_text())
     config = next(p for p in realm['identityProviders'] if p['alias'] == 'microsoft')['config']
     assert config['issuer'] == '${KC_IDP_MICROSOFT_ISSUERS:' + idp.microsoft_endpoints(None)['issuer'] + '}'
+    assert config['prompt'] == 'select_account'
     assert config['validateSignature'] == config['useJwksUrl'] == 'true'
 
 
