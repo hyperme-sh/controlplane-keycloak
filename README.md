@@ -311,6 +311,10 @@ That script checks `uv.lock`, compiles `keycloak/`, runs pytest (locked at
 `tests_tools/`, builds `controlplane-keycloak.tar.gz`, checks every archive
 member against the checkout, and runs the same tests from the extracted
 archive. Both runs must execute the same non-empty test set with no skips.
+Historical qualification/candidate digests are retained as provenance and are
+not compared with each new development archive. The standalone
+`scripts/verify_release_candidate.py` verifier remains available when checking
+a specific release candidate against its recorded bytes.
 
 The tests use fake Admin APIs. A green run checks the declaration, the
 helpers, and the archive. Live broker login and the identity seed need a
