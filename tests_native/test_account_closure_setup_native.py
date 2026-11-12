@@ -35,6 +35,7 @@ def provider():
             command="start-dev --http-port=8080 --hostname-strict=false",
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
+            extra_hosts={"host.docker.internal":"host-gateway"},
             ports={"8080/tcp": ("127.0.0.1", None)},
             volumes={str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"}}, detach=True)
         container.reload()
@@ -235,21 +236,52 @@ def test_native_startup_reconciliation_and_admin_separation(provider):
             response.raise_for_status();return response.json()
     native=OptionalAdmin()
     config=json.loads((ROOT/'tests/fixtures/startup-identity.json').read_text())
+    from startup_contract import binding_fingerprint
+    config['binding']['keycloak_admin']['realm']=realm
+    config['binding_sha256']=binding_fingerprint(config['binding'])
     subject=str(uuid.uuid4());stamp=fingerprint(config)
-    person={'person_id':subject,'broker_subject':subject,'tenant_id':config['tenant_id'],'status':'bound','mapping_sha256':stamp}
+    person={'person_id':subject,'broker_subject':subject,'tenant_id':config['owner']['tenant_id'],'status':'bound','mapping_sha256':stamp}
     acl={'person_id':subject,'status':'reconciled','mapping_sha256':stamp}
-    issuer='https://login.microsoftonline.com/'+config['entra_tenant_id']+'/v2.0'
-    admin.post('/identity-provider/instances',{'alias':'microsoft','providerId':'oidc','enabled':True,
-        'config':{'issuer':issuer,'validateSignature':'true','useJwksUrl':'true','clientId':'synthetic-client','clientSecret':uuid.uuid4().hex,
+    issuer='https://login.microsoftonline.com/'+config['binding']['entra']['tenant_id']+'/v2.0'
+    admin.post('/identity-provider/instances',{'alias':config['binding']['entra']['broker'],'providerId':'startup-entra','enabled':True,
+        'config':{'issuer':issuer,'validateSignature':'true','useJwksUrl':'true','clientId':config['binding']['entra']['audience'],'clientSecret':uuid.uuid4().hex,
             'authorizationUrl':issuer+'/authorize','tokenUrl':issuer+'/token','jwksUrl':issuer+'/keys'}})
     result=reconcile(native,config,person,acl)
     assert result==reconcile(native,config,person,acl)
     assert result['application_permissions']==[]
-    assert admin.get('/identity-provider/instances/microsoft')['providerId']=='startup-entra'
+    assert admin.get('/identity-provider/instances/'+config['binding']['entra']['broker'])['providerId']=='startup-entra'
     assert len(admin.get('/users?username=startup-'+subject+'&exact=true'))==1
     links=admin.get('/users/'+subject+'/federated-identity')
-    assert len(links)==1 and links[0]['userId']=='entra:'+config['entra_tenant_id']+':'+config['entra_account_id']
+    assert len(links)==1 and links[0]['userId']==config['binding']['entra']['subject']
     management=admin.get('/clients?clientId=realm-management')[0]['id']
     roles=admin.get('/users/'+subject+'/role-mappings/clients/'+management)
     assert [r['name'] for r in roles]==['realm-admin']
     assert admin.get('/users/'+subject+'/credentials')==[]
+
+    # Exercise the installed provider with signed upstream claims and the actual
+    # authorization-code exchange. No external provider or user key is involved.
+    from startup_broker import upstream,broker_login
+    model=json.loads((ROOT/'keycloak/import/controlplane-realm.json').read_text())
+    mappers=next(c for c in model['clients'] if any(m.get('name')=='entra_tenant_id' for m in c.get('protocolMappers',[])))['protocolMappers']
+    selected=[m for m in mappers if m['name'] in ('login_provider','entra_tenant_id','entra_object_id')]
+    selected.append({'name':'startup-audience','protocol':'openid-connect','protocolMapper':'oidc-audience-mapper',
+        'config':{'included.client.audience':config['owner']['broker']['audience'],'access.token.claim':'true'}})
+    admin.post('/clients',{'clientId':config['owner']['broker']['audience'],'enabled':True,'publicClient':True,
+        'standardFlowEnabled':True,'redirectUris':['https://startup-callback.example.invalid/complete'],
+        'protocol':'openid-connect','protocolMappers':selected})
+    with upstream(config) as (upstream_url,state):
+        broker=admin.get('/identity-provider/instances/'+config['binding']['entra']['broker'])
+        broker['config'].update(authorizationUrl=upstream_url+'/authorize',tokenUrl=upstream_url+'/token',
+            jwksUrl=upstream_url+'/keys',disableUserInfo='true',defaultScope='openid profile email')
+        admin.put('/identity-provider/instances/'+config['binding']['entra']['broker'],broker)
+        claims=broker_login(transport,base,realm,config,state)
+        assert claims is not None
+        assert claims['sub']==subject
+        assert claims['login_provider']==config['binding']['entra']['broker']
+        assert claims['entra_tenant_id']==config['binding']['entra']['tenant_id']
+        assert claims['entra_object_id']==config['binding']['entra']['object_id']
+        for changes in ({'oid':str(uuid.uuid4())},{'tid':str(uuid.uuid4())},{'sub':'another-upstream-subject'},{'ver':'1.0'}):
+            state['changes']=changes
+            assert broker_login(transport,base,realm,config,state) is None
+        assert state['requests']==5
+        assert len(admin.get('/users?username=startup-'+subject+'&exact=true'))==1

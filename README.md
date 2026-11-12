@@ -364,13 +364,20 @@ from application permissions. Conflicting email labels, profile attributes,
 broker configuration or prior mappings fail closed. Profile mapping attributes
 are administrator-only; retries reuse the same user and link.
 
-The `startup-entra` provider extends Keycloak 26.5 OIDC validation. Generic OIDC
-uses a pairwise `sub`, which is not the Entra `oid`. After normal signature,
-issuer, audience and nonce validation, this provider maps only the configured
-`iss`/`tid`/`oid` tuple to its pre-established federated link. Unrelated accounts
-retain their subjects. A different account cannot select the reserved subject
-or use the configured email to link. The shared `microsoft` alias and OAuth
-application stay singular; no automatic email-linking flow is introduced.
+The `startup-entra` provider extends Keycloak 26.5 OIDC validation. After
+signature, issuer, audience and nonce validation, it accepts only the configured
+Entra v2 `iss`/`tid`/`oid`/`sub` tuple and supplies verified tenant/account session
+notes to the existing application token mappers. Other accounts are refused by
+this dedicated alias. The canonical binding selects its alias explicitly; an
+existing alias with another provider type is refused before any user writes.
+No provider is deleted, no email-linking flow is added, and the ordinary
+Microsoft login alias remains available independently.
+
+If the configured alias does not exist, the command creates it from the exact
+Entra tenant and audience plus `STARTUP_ENTRA_CLIENT_SECRET_FILE`, a private
+owner-supplied application secret. It creates no Entra application or credential.
+The provider JAR must already be installed. `binding.keycloak_admin.enabled`
+controls the separate realm-admin grant; false never creates that grant.
 
 Build with `bash scripts/build-startup-provider.sh` and install the resulting
 JAR in Keycloak's providers directory before configuring `startup-entra`.

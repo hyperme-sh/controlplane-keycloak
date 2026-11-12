@@ -23,5 +23,7 @@ public final class StartupEntraProvider extends OIDCIdentityProvider {
         Object selected=context.getContextData().get("startupSelectedSubject");
         if (!(selected instanceof String) || ((String)selected).isBlank()) throw new IllegalArgumentException("Verified startup broker subject missing");
         context.setId((String)selected);
+        context.setSessionNote("tid",getConfig().getConfig().get("startupTenant"));
+        context.setSessionNote("oid",getConfig().getConfig().get("startupAccount"));
     }
 }

@@ -13,12 +13,10 @@ public final class StartupBinding {
         }
         boolean matches = Objects.equals(issuer,config.get("startupIssuer"))
             && Objects.equals(claims.get("tid"),config.get("startupTenant"))
-            && Objects.equals(claims.get("oid"),config.get("startupAccount"));
+            && Objects.equals(claims.get("oid"),config.get("startupAccount"))
+            && Objects.equals(claims.get("ver"),"2.0")
+            && Objects.equals(upstreamSubject,config.get("startupSubject"));
         if (matches) return config.get("startupSubject");
-        if (Objects.equals(upstreamSubject,config.get("startupSubject"))
-            || (email != null && email.equalsIgnoreCase(config.get("startupEmail")))) {
-            throw new IllegalArgumentException("Configured startup identity conflicts with broker account");
-        }
-        return upstreamSubject;
+        throw new IllegalArgumentException("Configured startup identity conflicts with broker account");
     }
 }
