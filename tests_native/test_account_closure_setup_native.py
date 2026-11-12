@@ -35,7 +35,8 @@ def provider():
             command="start-dev --http-port=8080 --hostname-strict=false",
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
-            ports={"8080/tcp": ("127.0.0.1", None)}, detach=True)
+            ports={"8080/tcp": ("127.0.0.1", None)},
+            volumes={str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"}}, detach=True)
         container.reload()
         binding = container.attrs["NetworkSettings"]["Ports"]["8080/tcp"][0]
         assert binding["HostIp"] == "127.0.0.1"
@@ -217,3 +218,38 @@ def test_native_disabled_credentials_exact_human_ai_grants_and_runtime_permissio
         assert deleted.status_code == (403 if name == setup.READER else 204)
         if name == setup.WORKER:
             assert transport.get(root + "/users/" + target, headers=headers).status_code == 404
+
+
+def test_native_startup_reconciliation_and_admin_separation(provider):
+    import json
+    import sys
+    sys.path.insert(0,str(ROOT/'keycloak'))
+    from startup_identity import reconcile
+    from startup_contract import fingerprint
+    admin,transport,base,realm=provider
+    class OptionalAdmin:
+        def __getattr__(self,name):return getattr(admin,name)
+        def get_optional(self,path):
+            response=transport.get(admin.root+path,headers={'Authorization':'Bearer '+admin.token})
+            if response.status_code==404:return None
+            response.raise_for_status();return response.json()
+    native=OptionalAdmin()
+    config=json.loads((ROOT/'tests/fixtures/startup-identity.json').read_text())
+    subject=str(uuid.uuid4());stamp=fingerprint(config)
+    person={'person_id':subject,'broker_subject':subject,'tenant_id':config['tenant_id'],'status':'bound','mapping_sha256':stamp}
+    acl={'person_id':subject,'status':'reconciled','mapping_sha256':stamp}
+    issuer='https://login.microsoftonline.com/'+config['entra_tenant_id']+'/v2.0'
+    admin.post('/identity-provider/instances',{'alias':'microsoft','providerId':'oidc','enabled':True,
+        'config':{'issuer':issuer,'validateSignature':'true','useJwksUrl':'true','clientId':'synthetic-client','clientSecret':uuid.uuid4().hex,
+            'authorizationUrl':issuer+'/authorize','tokenUrl':issuer+'/token','jwksUrl':issuer+'/keys'}})
+    result=reconcile(native,config,person,acl)
+    assert result==reconcile(native,config,person,acl)
+    assert result['application_permissions']==[]
+    assert admin.get('/identity-provider/instances/microsoft')['providerId']=='startup-entra'
+    assert len(admin.get('/users?username=startup-'+subject+'&exact=true'))==1
+    links=admin.get('/users/'+subject+'/federated-identity')
+    assert len(links)==1 and links[0]['userId']=='entra:'+config['entra_tenant_id']+':'+config['entra_account_id']
+    management=admin.get('/clients?clientId=realm-management')[0]['id']
+    roles=admin.get('/users/'+subject+'/role-mappings/clients/'+management)
+    assert [r['name'] for r in roles]==['realm-admin']
+    assert admin.get('/users/'+subject+'/credentials')==[]

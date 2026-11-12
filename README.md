@@ -353,3 +353,33 @@ How qualification snapshots, the stable tag, and the publisher relate is in
 
 First-party tooling is [Apache-2.0](LICENSE). The source archive includes
 that license text. The development dependency (pytest) keeps its own license.
+
+## Configured startup identity
+
+`keycloak/startup_identity.py` runs only after User/Auth binding and ACL
+reconciliation of the same private mapping. It creates no password or external
+Entra account. It preserves the chosen opaque application subject, adds one
+Microsoft federated link, and assigns `realm-management/realm-admin` separately
+from application permissions. Conflicting email labels, profile attributes,
+broker configuration or prior mappings fail closed. Profile mapping attributes
+are administrator-only; retries reuse the same user and link.
+
+The `startup-entra` provider extends Keycloak 26.5 OIDC validation. Generic OIDC
+uses a pairwise `sub`, which is not the Entra `oid`. After normal signature,
+issuer, audience and nonce validation, this provider maps only the configured
+`iss`/`tid`/`oid` tuple to its pre-established federated link. Unrelated accounts
+retain their subjects. A different account cannot select the reserved subject
+or use the configured email to link. The shared `microsoft` alias and OAuth
+application stay singular; no automatic email-linking flow is introduced.
+
+Build with `bash scripts/build-startup-provider.sh` and install the resulting
+JAR in Keycloak's providers directory before configuring `startup-entra`.
+The standalone tooling archive includes the tested JAR and its source. Java
+unit tests and Python command contracts run in CI; native owner checks also
+verify the provider, user, federated link and separate realm grant. Agents do
+not run the native suite. Combined scheduled registration is Infra #923.
+
+The command requires `STARTUP_IDENTITY_ENABLED=1`, `KEYCLOAK_INTERNAL_URL`,
+`KEYCLOAK_REALM` and `STARTUP_KEYCLOAK_ADMIN_TOKEN_FILE`; its arguments are private
+configuration and preceding owner-result files. Credentials are never returned.
+No package version or release authorization changes are implied.

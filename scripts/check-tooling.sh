@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 unset PYTHONPATH UV_NO_SYNC
+bash scripts/build-startup-provider.sh
 uv lock --check
 uv sync --frozen --python 3.13
 uv run --frozen python -m compileall -q keycloak

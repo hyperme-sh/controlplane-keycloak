@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 unset PYTHONPATH UV_NO_SYNC SKIP_TESTCONTAINERS
+bash scripts/build-startup-provider.sh
 uv lock --check
 uv sync --frozen --group native --python 3.13
 docker info >/dev/null
