@@ -21,9 +21,29 @@ KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak@sha256:8d44614c74798322c4e07fbe0ecb1
 
 
 @pytest.fixture(scope="module")
-def provider():
+def provider(tmp_path_factory):
     # No configured provider, credentials, host port or persistent volume is used.
     # Missing Docker is a failure in this explicit native lane, never a skip.
+    import os,ssl,ipaddress
+    from datetime import datetime,timedelta,timezone
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes,serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    directory=tmp_path_factory.mktemp('keycloak-tls')
+    key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
+    name=x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME,'isolated-keycloak')])
+    now=datetime.now(timezone.utc)
+    cert=(x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+        .serial_number(x509.random_serial_number()).not_valid_before(now-timedelta(minutes=1)).not_valid_after(now+timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True,path_length=None),critical=True)
+        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]),critical=False)
+        .sign(key,hashes.SHA256()))
+    cert_path=directory/'cert.pem';key_path=directory/'key.pem'
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
+    cert_path.chmod(0o644);key_path.chmod(0o644)
+    previous_ca=os.environ.get('SSL_CERT_FILE');os.environ['SSL_CERT_FILE']=str(cert_path)
+    context=ssl.create_default_context(cafile=str(cert_path))
     client = docker.DockerClient(base_url="unix:///var/run/docker.sock")
     client.ping()
     secret = uuid.uuid4().hex + uuid.uuid4().hex
@@ -32,17 +52,17 @@ def provider():
         if not client.images.list(name=KEYCLOAK_IMAGE):
             client.images.pull(KEYCLOAK_IMAGE)
         container = client.containers.run(KEYCLOAK_IMAGE,
-            command="start-dev --http-port=8080 --hostname-strict=false",
+            command="start-dev --https-port=8443 --https-certificate-file=/tmp/startup-cert.pem --https-certificate-key-file=/tmp/startup-key.pem --hostname-strict=false",
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
             extra_hosts={"host.docker.internal":"host-gateway"},
-            ports={"8080/tcp": ("127.0.0.1", None)},
-            volumes={str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"}}, detach=True)
+            ports={"8443/tcp": ("127.0.0.1", None)},
+            volumes={str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"},str(cert_path):{"bind":"/tmp/startup-cert.pem","mode":"ro"},str(key_path):{"bind":"/tmp/startup-key.pem","mode":"ro"}}, detach=True)
         container.reload()
-        binding = container.attrs["NetworkSettings"]["Ports"]["8080/tcp"][0]
+        binding = container.attrs["NetworkSettings"]["Ports"]["8443/tcp"][0]
         assert binding["HostIp"] == "127.0.0.1"
-        base = "http://127.0.0.1:" + binding["HostPort"]
-        with httpx.Client(base_url=base, timeout=15, trust_env=False, follow_redirects=False) as transport:
+        base = "https://127.0.0.1:" + binding["HostPort"]
+        with httpx.Client(base_url=base, timeout=15, trust_env=False, follow_redirects=False,verify=context) as transport:
             deadline = time.monotonic() + 180
             while True:
                 try:
@@ -68,6 +88,8 @@ def provider():
         if container is not None:
             container.remove(force=True, v=True)
         client.close()
+        if previous_ca is None:os.environ.pop('SSL_CERT_FILE',None)
+        else:os.environ['SSL_CERT_FILE']=previous_ca
 
 
 def verified_token(transport, base, realm, client_id, *, subject, secret=None, username=None, password=None):
