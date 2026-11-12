@@ -27,7 +27,9 @@ class Admin:
         if '/role-mappings/' in path:return copy.deepcopy(self.roles.get(path.split('/')[2],[]))
         raise AssertionError(path)
     def post(self,path,body):
-        if path=='/users':
+        if path=='/partialImport':
+            assert body['ifResourceExists']=='FAIL'
+            body=body['users'][0]
             if body['id'] in self.users:raise ValueError('duplicate')
             self.users[body['id']]=copy.deepcopy(body);return
         if path.endswith('/federated-identity/microsoft'):

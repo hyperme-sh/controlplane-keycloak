@@ -54,8 +54,8 @@ def reconcile(admin,config,person,acl):
     if declared!=profile.get('attributes',[]):admin.put('/users/profile',{**profile,'attributes':declared})
     if current is None:
         try:
-            admin.post('/users',{'id':subject,'username':username,'email':config['email'],'emailVerified':False,
-                'enabled':True,'firstName':'Configured','lastName':'Operator','attributes':attributes})
+            admin.post('/partialImport',{'ifResourceExists':'FAIL','users':[{'id':subject,'username':username,'email':config['email'],'emailVerified':False,
+                'enabled':True,'firstName':'Configured','lastName':'Operator','attributes':attributes}]})
         except Exception:
             # A concurrent identical create may win. Only its exact mapping is reusable.
             found=admin.get_optional('/users/'+encoded)
