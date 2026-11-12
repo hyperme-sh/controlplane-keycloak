@@ -13,7 +13,10 @@ output.mkdir(parents=True, exist_ok=True)
 files = [root / name for name in ('LICENSE', 'README.md', 'AGENTS.md', 'pyproject.toml', 'uv.lock')]
 for folder in ('keycloak', 'tests', 'tests_tools', 'tests_native', 'scripts'):
     files.extend(p for p in (root / folder).rglob('*')
-                 if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc')
+                 if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc' and 'target' not in p.parts)
+provider = root / 'keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar'
+if not provider.is_file(): raise ValueError('Built startup provider required')
+files.append(provider)
 expected = {p.relative_to(root).as_posix(): p for p in files}
 archive_path = output / 'controlplane-keycloak.tar.gz'
 with archive_path.open('wb') as output_file, gzip.GzipFile(filename='', mode='wb', fileobj=output_file, mtime=0) as compressed:

@@ -21,9 +21,29 @@ KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak@sha256:8d44614c74798322c4e07fbe0ecb1
 
 
 @pytest.fixture(scope="module")
-def provider():
+def provider(tmp_path_factory):
     # No configured provider, credentials, host port or persistent volume is used.
     # Missing Docker is a failure in this explicit native lane, never a skip.
+    import os,ssl,ipaddress
+    from datetime import datetime,timedelta,timezone
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes,serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    directory=tmp_path_factory.mktemp('keycloak-tls')
+    key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
+    name=x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME,'isolated-keycloak')])
+    now=datetime.now(timezone.utc)
+    cert=(x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+        .serial_number(x509.random_serial_number()).not_valid_before(now-timedelta(minutes=1)).not_valid_after(now+timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True,path_length=None),critical=True)
+        .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]),critical=False)
+        .sign(key,hashes.SHA256()))
+    cert_path=directory/'cert.pem';key_path=directory/'key.pem'
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
+    cert_path.chmod(0o644);key_path.chmod(0o644)
+    previous_ca=os.environ.get('SSL_CERT_FILE');os.environ['SSL_CERT_FILE']=str(cert_path)
+    context=ssl.create_default_context(cafile=str(cert_path))
     client = docker.DockerClient(base_url="unix:///var/run/docker.sock")
     client.ping()
     secret = uuid.uuid4().hex + uuid.uuid4().hex
@@ -32,15 +52,17 @@ def provider():
         if not client.images.list(name=KEYCLOAK_IMAGE):
             client.images.pull(KEYCLOAK_IMAGE)
         container = client.containers.run(KEYCLOAK_IMAGE,
-            command="start-dev --http-port=8080 --hostname-strict=false",
+            command="start-dev --https-port=8443 --https-certificate-file=/tmp/startup-cert.pem --https-certificate-key-file=/tmp/startup-key.pem --hostname-strict=false",
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
-            ports={"8080/tcp": ("127.0.0.1", None)}, detach=True)
+            extra_hosts={"host.docker.internal":"host-gateway"},
+            ports={"8443/tcp": ("127.0.0.1", None)},
+            volumes={str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"},str(cert_path):{"bind":"/tmp/startup-cert.pem","mode":"ro"},str(key_path):{"bind":"/tmp/startup-key.pem","mode":"ro"}}, detach=True)
         container.reload()
-        binding = container.attrs["NetworkSettings"]["Ports"]["8080/tcp"][0]
+        binding = container.attrs["NetworkSettings"]["Ports"]["8443/tcp"][0]
         assert binding["HostIp"] == "127.0.0.1"
-        base = "http://127.0.0.1:" + binding["HostPort"]
-        with httpx.Client(base_url=base, timeout=15, trust_env=False, follow_redirects=False) as transport:
+        base = "https://127.0.0.1:" + binding["HostPort"]
+        with httpx.Client(base_url=base, timeout=15, trust_env=False, follow_redirects=False,verify=context) as transport:
             deadline = time.monotonic() + 180
             while True:
                 try:
@@ -66,6 +88,8 @@ def provider():
         if container is not None:
             container.remove(force=True, v=True)
         client.close()
+        if previous_ca is None:os.environ.pop('SSL_CERT_FILE',None)
+        else:os.environ['SSL_CERT_FILE']=previous_ca
 
 
 def verified_token(transport, base, realm, client_id, *, subject, secret=None, username=None, password=None):
@@ -217,3 +241,69 @@ def test_native_disabled_credentials_exact_human_ai_grants_and_runtime_permissio
         assert deleted.status_code == (403 if name == setup.READER else 204)
         if name == setup.WORKER:
             assert transport.get(root + "/users/" + target, headers=headers).status_code == 404
+
+
+def test_native_startup_reconciliation_and_admin_separation(provider):
+    import json
+    import sys
+    sys.path.insert(0,str(ROOT/'keycloak'))
+    from startup_identity import reconcile
+    from startup_contract import fingerprint
+    admin,transport,base,realm=provider
+    class OptionalAdmin:
+        def __getattr__(self,name):return getattr(admin,name)
+        def get_optional(self,path):
+            response=transport.get(admin.root+path,headers={'Authorization':'Bearer '+admin.token})
+            if response.status_code==404:return None
+            response.raise_for_status();return response.json()
+    native=OptionalAdmin()
+    config=json.loads((ROOT/'tests/fixtures/startup-identity.json').read_text())
+    from startup_contract import binding_fingerprint
+    config['binding']['keycloak_admin']['realm']=realm
+    config['binding_sha256']=binding_fingerprint(config['binding'])
+    subject=str(uuid.uuid4());stamp=fingerprint(config)
+    person={'person_id':subject,'broker_subject':subject,'tenant_id':config['owner']['tenant_id'],'status':'bound','mapping_sha256':stamp}
+    acl={'person_id':subject,'status':'reconciled','mapping_sha256':stamp}
+    issuer='https://login.microsoftonline.com/'+config['binding']['entra']['tenant_id']+'/v2.0'
+    admin.post('/identity-provider/instances',{'alias':config['binding']['entra']['broker'],'providerId':'startup-entra','enabled':True,
+        'config':{'issuer':issuer,'validateSignature':'true','useJwksUrl':'true','clientId':config['binding']['entra']['audience'],'clientSecret':uuid.uuid4().hex,
+            'authorizationUrl':issuer+'/authorize','tokenUrl':issuer+'/token','jwksUrl':issuer+'/keys'}})
+    result=reconcile(native,config,person,acl)
+    assert result==reconcile(native,config,person,acl)
+    assert result['application_permissions']==[]
+    assert admin.get('/identity-provider/instances/'+config['binding']['entra']['broker'])['providerId']=='startup-entra'
+    assert len(admin.get('/users?username=startup-'+subject+'&exact=true'))==1
+    links=admin.get('/users/'+subject+'/federated-identity')
+    assert len(links)==1 and links[0]['userId']==config['binding']['entra']['subject']
+    management=admin.get('/clients?clientId=realm-management')[0]['id']
+    roles=admin.get('/users/'+subject+'/role-mappings/clients/'+management)
+    assert [r['name'] for r in roles]==['realm-admin']
+    assert admin.get('/users/'+subject+'/credentials')==[]
+
+    # Exercise the installed provider with signed upstream claims and the actual
+    # authorization-code exchange. No external provider or user key is involved.
+    from startup_broker import upstream,broker_login
+    model=json.loads((ROOT/'keycloak/import/controlplane-realm.json').read_text())
+    mappers=next(c for c in model['clients'] if any(m.get('name')=='entra_tenant_id' for m in c.get('protocolMappers',[])))['protocolMappers']
+    selected=[m for m in mappers if m['name'] in ('login_provider','entra_tenant_id','entra_object_id')]
+    selected.append({'name':'startup-audience','protocol':'openid-connect','protocolMapper':'oidc-audience-mapper',
+        'config':{'included.client.audience':config['owner']['broker']['audience'],'access.token.claim':'true'}})
+    admin.post('/clients',{'clientId':config['owner']['broker']['audience'],'enabled':True,'publicClient':True,
+        'standardFlowEnabled':True,'redirectUris':['https://startup-callback.example.invalid/complete'],
+        'protocol':'openid-connect','protocolMappers':selected})
+    with upstream(config) as (upstream_url,state):
+        broker=admin.get('/identity-provider/instances/'+config['binding']['entra']['broker'])
+        broker['config'].update(authorizationUrl=upstream_url+'/authorize',tokenUrl=upstream_url+'/token',
+            jwksUrl=upstream_url+'/keys',disableUserInfo='true',defaultScope='openid profile email')
+        admin.put('/identity-provider/instances/'+config['binding']['entra']['broker'],broker)
+        claims=broker_login(transport,base,realm,config,state)
+        assert claims is not None
+        assert claims['sub']==subject
+        assert claims['login_provider']==config['binding']['entra']['broker']
+        assert claims['entra_tenant_id']==config['binding']['entra']['tenant_id']
+        assert claims['entra_object_id']==config['binding']['entra']['object_id']
+        for changes in ({'oid':str(uuid.uuid4())},{'tid':str(uuid.uuid4())},{'sub':'another-upstream-subject'},{'ver':'1.0'}):
+            state['changes']=changes
+            assert broker_login(transport,base,realm,config,state) is None
+        assert state['requests']==5
+        assert len(admin.get('/users?username=startup-'+subject+'&exact=true'))==1

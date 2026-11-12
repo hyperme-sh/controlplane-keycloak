@@ -353,3 +353,40 @@ How qualification snapshots, the stable tag, and the publisher relate is in
 
 First-party tooling is [Apache-2.0](LICENSE). The source archive includes
 that license text. The development dependency (pytest) keeps its own license.
+
+## Configured startup identity
+
+`keycloak/startup_identity.py` runs only after User/Auth binding and ACL
+reconciliation of the same private mapping. It creates no password or external
+Entra account. It preserves the chosen opaque application subject, adds one
+Microsoft federated link, and assigns `realm-management/realm-admin` separately
+from application permissions. Conflicting email labels, profile attributes,
+broker configuration or prior mappings fail closed. Profile mapping attributes
+are administrator-only; retries reuse the same user and link.
+
+The `startup-entra` provider extends Keycloak 26.5 OIDC validation. After
+signature, issuer, audience and nonce validation, it accepts only the configured
+Entra v2 `iss`/`tid`/`oid`/`sub` tuple and supplies verified tenant/account session
+notes to the existing application token mappers. Other accounts are refused by
+this dedicated alias. The canonical binding selects its alias explicitly; an
+existing alias with another provider type is refused before any user writes.
+No provider is deleted, no email-linking flow is added, and the ordinary
+Microsoft login alias remains available independently.
+
+If the configured alias does not exist, the command creates it from the exact
+Entra tenant and audience plus `STARTUP_ENTRA_CLIENT_SECRET_FILE`, a private
+owner-supplied application secret. It creates no Entra application or credential.
+The provider JAR must already be installed. `binding.keycloak_admin.enabled`
+controls the separate realm-admin grant; false never creates that grant.
+
+Build with `bash scripts/build-startup-provider.sh` and install the resulting
+JAR in Keycloak's providers directory before configuring `startup-entra`.
+The standalone tooling archive includes the tested JAR and its source. Java
+unit tests and Python command contracts run in CI; native owner checks also
+verify the provider, user, federated link and separate realm grant. Agents do
+not run the native suite. Combined scheduled registration is Infra #923.
+
+The command requires `STARTUP_IDENTITY_ENABLED=1`, `KEYCLOAK_INTERNAL_URL`,
+`KEYCLOAK_REALM` and `STARTUP_KEYCLOAK_ADMIN_TOKEN_FILE`; its arguments are private
+configuration and preceding owner-result files. Credentials are never returned.
+No package version or release authorization changes are implied.

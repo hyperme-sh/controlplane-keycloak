@@ -9,7 +9,7 @@ permissions:
 jobs:
   package:
     runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "linux", "x64", "debrunner"]') || 'ubuntu-24.04' }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Prepare release output
         run: echo "RELEASE_ARTIFACT_DIR=$(mktemp -d "$RUNNER_TEMP/release-dist.XXXXXX")" >> "$GITHUB_ENV"
@@ -20,6 +20,10 @@ jobs:
         with:
           version: '0.11.26'
           python-version: '3.13'
+      - name: Install Java provider build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-21-jdk-headless maven
       - run: bash scripts/check-tooling.sh
         env:
           TEST_EVIDENCE_DIR: ${{ runner.temp }}/keycloak-test-evidence
