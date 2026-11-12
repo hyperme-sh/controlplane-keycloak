@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import hashlib
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import json
+import re
 import threading
 import time
 from urllib.parse import parse_qs,urlencode,urlsplit
@@ -52,7 +53,7 @@ def broker_login(transport,base,realm,config,state):
     for _ in range(5):
         location=response.headers.get('location','')
         if '/authorize?' in location:break
-        assert response.status_code in (302,303),response.text[:500]
+        assert response.status_code in (302,303),(response.status_code,re.sub(r'<[^>]+>',' ',response.text)[-1500:])
         assert location.startswith(base),location
         response=transport.get(location)
     query=parse_qs(urlsplit(location).query)
