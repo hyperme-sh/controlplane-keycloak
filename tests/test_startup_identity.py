@@ -46,6 +46,7 @@ class Admin:
     def put(self,path,body):
         if path=='/users/profile':self.profile=copy.deepcopy(body)
         elif path=='/identity-provider/instances/'+self.alias:self.provider=copy.deepcopy(body)
+        elif path.startswith('/users/'):self.users[path.split('/')[-1]].update(copy.deepcopy(body))
         else:raise AssertionError(path)
 
 
@@ -111,3 +112,10 @@ class ExplicitBoundaryTests(unittest.TestCase):
         result=reconcile(self.admin,self.config,self.person,self.acl,entra_secret='synthetic-configured-secret')
         self.assertEqual(result['status'],'reconciled')
         self.assertEqual(self.admin.provider['providerId'],'startup-entra')
+
+    def test_completed_role_revocation_is_not_implicitly_restored(self):
+        reconcile(self.admin,self.config,self.person,self.acl)
+        self.admin.roles={}
+        before=copy.deepcopy(self.admin.__dict__)
+        with self.assertRaises(StartupConflict):reconcile(self.admin,self.config,self.person,self.acl)
+        self.assertEqual(before,self.admin.__dict__)

@@ -57,9 +57,17 @@ def reconcile(admin,config,person,acl,*,entra_secret=None):
     clients=admin.get('/clients?clientId=realm-management')
     if len(clients)!=1:raise StartupConflict('Realm management client unavailable')
     management=clients[0]['id'];role=admin.get('/clients/'+quote(management,safe='')+'/roles/realm-admin')
+    role_path='/users/'+encoded+'/role-mappings/clients/'+quote(management,safe='')
+    roles=admin.get(role_path) if current else []
+    enabled=config['binding']['keycloak_admin']['enabled']
+    present=any(r['id']==role['id'] for r in roles)
+    if present and not enabled:raise StartupConflict('Existing Keycloak admin grant conflicts with configuration')
+    completed=current and current.get('attributes',{}).get('startup_complete')==['true']
+    if completed and (not microsoft or broker.get('startupMapping')!=stamp or present!=enabled):
+        raise StartupConflict('Completed startup mapping changed; refusing implicit restoration')
     # Protect mapping attributes before writing them. Never loosen existing rules.
     profile=admin.get('/users/profile');declared=list(profile.get('attributes',[]))
-    for name in attributes:
+    for name in (*attributes,'startup_complete'):
         matches=[a for a in declared if a['name']==name]
         if matches and matches[0].get('permissions',{}).get('edit')!=['admin']:
             raise StartupConflict('Protected profile attribute conflicts: '+name)
@@ -86,12 +94,9 @@ def reconcile(admin,config,person,acl,*,entra_secret=None):
         startupIssuer=expected_issuer,startupSubject=upstream,startupEmail=config['owner']['profile']['email'])
     desired={**provider,'providerId':'startup-entra','trustEmail':False,'config':broker}
     if desired!=provider:admin.put(provider_path,desired)
-    role_path='/users/'+encoded+'/role-mappings/clients/'+quote(management,safe='')
-    roles=admin.get(role_path)
-    enabled=config['binding']['keycloak_admin']['enabled']
-    present=any(r['id']==role['id'] for r in roles)
-    if present and not enabled:raise StartupConflict('Existing Keycloak admin grant conflicts with configuration')
     if enabled and not present:admin.post(role_path,[role])
+    if not completed:
+        admin.put('/users/'+encoded,{'attributes':{**current.get('attributes',{}),'startup_complete':['true']}})
     return {'status':'reconciled','schema_version':1,'mapping_sha256':stamp,'person_id':person['person_id'],
             'broker_subject':subject,'keycloak_admin':enabled,'application_permissions':[]}
 
