@@ -96,7 +96,7 @@ def reconcile(admin,config,person,acl,*,entra_secret=None):
     if desired!=provider:admin.put(provider_path,desired)
     if enabled and not present:admin.post(role_path,[role])
     if not completed:
-        admin.put('/users/'+encoded,{'attributes':{**current.get('attributes',{}),'startup_complete':['true']}})
+        admin.put('/users/'+encoded,{**current,'attributes':{**current.get('attributes',{}),'startup_complete':['true']}})
     return {'status':'reconciled','schema_version':1,'mapping_sha256':stamp,'person_id':person['person_id'],
             'broker_subject':subject,'keycloak_admin':enabled,'application_permissions':[]}
 

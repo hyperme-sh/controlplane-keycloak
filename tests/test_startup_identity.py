@@ -46,7 +46,9 @@ class Admin:
     def put(self,path,body):
         if path=='/users/profile':self.profile=copy.deepcopy(body)
         elif path=='/identity-provider/instances/'+self.alias:self.provider=copy.deepcopy(body)
-        elif path.startswith('/users/'):self.users[path.split('/')[-1]].update(copy.deepcopy(body))
+        elif path.startswith('/users/'):
+            assert body.get('email')==self.users[path.split('/')[-1]]['email']
+            self.users[path.split('/')[-1]].update(copy.deepcopy(body))
         else:raise AssertionError(path)
 
 
