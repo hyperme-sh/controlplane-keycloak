@@ -57,7 +57,7 @@ def provider(tmp_path_factory):
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
             extra_hosts={"host.docker.internal":"host-gateway"},
             ports={"8443/tcp": ("127.0.0.1", None)},
-            volumes={str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"},str(cert_path):{"bind":"/tmp/startup-cert.pem","mode":"ro"},str(key_path):{"bind":"/tmp/startup-key.pem","mode":"ro"}}, detach=True)
+            volumes={str(ROOT/"keycloak/themes/hypermesh"):{"bind":"/opt/keycloak/themes/hypermesh","mode":"ro"},str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"},str(cert_path):{"bind":"/tmp/startup-cert.pem","mode":"ro"},str(key_path):{"bind":"/tmp/startup-key.pem","mode":"ro"}}, detach=True)
         container.reload()
         binding = container.attrs["NetworkSettings"]["Ports"]["8443/tcp"][0]
         assert binding["HostIp"] == "127.0.0.1"
@@ -307,3 +307,50 @@ def test_native_startup_reconciliation_and_admin_separation(provider):
             assert broker_login(transport,base,realm,config,state) is None
         assert state['requests']==5
         assert len(admin.get('/users?username=startup-'+subject+'&exact=true'))==1
+
+
+def test_native_hypermesh_legal_footer_on_login_and_registration(provider):
+    """Render inherited forms only in the disposable CI realm."""
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin
+
+    class Page(HTMLParser):
+        def __init__(self, source):
+            super().__init__()
+            self.links = {}
+            self.feed(source)
+        def handle_starttag(self, tag, attrs):
+            values = dict(attrs)
+            if tag == "a":
+                self.links[values.get("href", "")] = values
+
+    admin, transport, base, _ = provider
+    realm = "legal-theme-" + uuid.uuid4().hex
+    headers = {"Authorization": "Bearer " + admin.token}
+    created = transport.post("/admin/realms", headers=headers, json={
+        "realm": realm, "enabled": True, "registrationAllowed": True,
+        "clients": [{"clientId": "legal-portal", "publicClient": True,
+                     "standardFlowEnabled": True,
+                     "redirectUris": ["https://portal.example.invalid/callback"],
+                     "attributes": {"login_theme": "hypermesh"}}],
+        "identityProviders": [{"alias": "github", "providerId": "github", "enabled": True,
+                               "config": {"clientId": "unused-fixture", "clientSecret": "unused-fixture"}}],
+    })
+    assert created.status_code == 201
+    try:
+        response = transport.get(f"/realms/{realm}/protocol/openid-connect/auth", params={
+            "client_id": "legal-portal", "response_type": "code", "scope": "openid",
+            "redirect_uri": "https://portal.example.invalid/callback", "state": "fixture",
+        })
+        assert response.status_code == 200
+        page = Page(response.text)
+        assert any("/broker/github/" in href for href in page.links)
+        registration = next(href for href in page.links if "/login-actions/registration" in href)
+        for html in (response.text, transport.get(urljoin(base, registration)).raise_for_status().text):
+            links = Page(html).links
+            for url in ("https://hyperme.sh/privacy", "https://hyperme.sh/terms"):
+                assert links[url]["rel"] == "noreferrer"
+            assert "Hypermesh is for adults 18 and older." in html
+            assert "Fyber Labs TN LLC" in html
+    finally:
+        transport.delete(f"/admin/realms/{realm}", headers=headers).raise_for_status()
