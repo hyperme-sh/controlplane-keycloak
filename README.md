@@ -332,22 +332,26 @@ permissions. The native lane also uses immutable identity revision
 tokens and reject the unselected human through the actual consumer validator.
 
 Pull requests and pushes to `main` run
-[`.github/workflows/tooling.yml`](.github/workflows/tooling.yml), which is
-both offline and native scripts. JUnit and the contract evidence are kept as the `test-evidence`
-artifact for 30 days. On `main`, the validated archive is the `tested-dist`
-artifact for 90 days.
+[`.github/workflows/tooling.yml`](.github/workflows/tooling.yml), preserving
+the existing offline checks and disposable-realm validation. Matching test
+inventories are checked by the scripts and summarized in the job log. Temporary
+archives and reports are not uploaded as Actions artifacts or wrapped in
+source-bundle containers. Public jobs use hosted runners; private jobs use
+debrunners.
 [`.github/workflows/version-policy.yml`](.github/workflows/version-policy.yml)
 checks the version recorded for `pyproject.toml`.
 
 ## Release and versioning
 
 This checkout's project is `controlplane-keycloak-checks` **0.1.0**
-(`pyproject.toml`), on release line `0.1` (`release-policy.json`). Day-to-day
-pushes archive that tree in Actions and do not publish a GitHub release. The
-immutable stable release recorded for this repository is
-[v0.24.1](https://github.com/hyperme-sh/controlplane-keycloak/releases/tag/v0.24.1).
-How qualification snapshots, the stable tag, and the publisher relate is in
-[docs/releasing.md](docs/releasing.md).
+(`pyproject.toml`), on release line `0.1` (`release-policy.json`). The package
+publisher is retired; tag-time admission does not publish. The historical
+[v0.24.1 release](https://github.com/hyperme-sh/controlplane-keycloak/releases/tag/v0.24.1)
+and existing tags remain unchanged.
+
+This tooling has no standalone runtime image or TEST channel. Consuming services
+publish their own GHCR images and follow moving TEST channels. Distribution
+policy is documented in [docs/releasing.md](docs/releasing.md).
 
 ## License
 
