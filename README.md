@@ -390,3 +390,27 @@ The command requires `STARTUP_IDENTITY_ENABLED=1`, `KEYCLOAK_INTERNAL_URL`,
 `KEYCLOAK_REALM` and `STARTUP_KEYCLOAK_ADMIN_TOKEN_FILE`; its arguments are private
 configuration and preceding owner-result files. Credentials are never returned.
 No package version or release authorization changes are implied.
+
+
+## Optional Hypermesh login theme
+
+`keycloak/themes/hypermesh` extends Keycloak's `keycloak.v2` login theme and
+replaces only its shared `footer.ftl` macro. Login, provider selection and
+registration retain the upstream forms, with canonical Privacy/Terms links and
+the existing 18+ eligibility notice. Links suppress the authentication-page
+referrer. No policy acceptance, cookies or authentication behavior is added.
+The existing age confirmation and Auth service policy-version ownership remain
+unchanged. See Portal #122 and Keycloak #34.
+
+The theme is included in the tooling archive. It is **not installed or selected**
+by the realm import or reconciliation helpers. Future authorized deployment
+must deliver the theme directory and select `hypermesh` only for the Hypermesh
+Portal client's `login_theme` attribute; do not change the shared realm's theme
+or apply Hypermesh policy copy to other products. No shared installation or
+activation is part of this change.
+
+Offline tests check the static theme boundary. The existing native CI lane
+renders login/provider selection and registration with this theme in a new,
+disposable realm, without contacting an identity provider or creating a user.
+The native fixture mounts the packaged theme read-only and removes the realm
+and container independently. Shared TEST readiness remains separately owned.
