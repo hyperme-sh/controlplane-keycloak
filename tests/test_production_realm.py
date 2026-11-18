@@ -24,10 +24,14 @@ def test_production_import_leaves_login_disabled():
         assert client["attributes"]["pkce.code.challenge.method"] == "S256"
         assert not client["enabled"] and not client["directAccessGrantsEnabled"]
         assert "secret" not in client
+        assert client["fullScopeAllowed"] is False
+        assert client["defaultClientScopes"] == ["basic", "email", "profile", "acr"]
+        assert client["optionalClientScopes"] == []
 
 
 @pytest.mark.parametrize("callback", [
     "https://test.s3r.ch/auth/callback", "http://s3r.ch/auth/callback",
+    "https://s3r.ch/auth/\x00callback", "https://s3r.ch/auth/<callback>",
     "https://s3r.ch/*", "https://s3r.ch:443/auth/callback",
     "https://s3r.ch@foreign.example/auth/callback", "https://s3r.ch/auth/../callback",
 ])

@@ -1,6 +1,7 @@
 """Render a clean production issuer bootstrap realm without users or secrets."""
 import argparse
 import json
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -19,7 +20,7 @@ def validate_callback(client_id, value):
         raise ValueError("Exact production callback required")
     url = urlsplit(value)
     if (url.scheme != "https" or url.netloc not in SITES[client_id]
-            or not url.path.startswith("/") or url.path == "/"
+            or not re.fullmatch(r"/[A-Za-z0-9._~!$&'()+,;=:@/-]+", url.path)
             or any(part in (".", "..") for part in url.path.split("/"))):
         raise ValueError("Exact production callback required")
     return value
@@ -36,6 +37,9 @@ def render(callbacks):
             "protocol": "openid-connect",
             "enabled": False,
             "publicClient": True,
+            "fullScopeAllowed": False,
+            "defaultClientScopes": ["basic", "email", "profile", "acr"],
+            "optionalClientScopes": [],
             "standardFlowEnabled": True,
             "implicitFlowEnabled": False,
             "directAccessGrantsEnabled": False,
