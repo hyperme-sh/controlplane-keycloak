@@ -240,6 +240,55 @@ def open_test_registration(admin: AdminClient) -> None:
     print("  test-plane registration open")
 
 
+def prepare_site_brokers(admin: AdminClient) -> None:
+    """Stage new aliases without enabling sign-in or changing existing links."""
+    pairs = [(provider, site) for provider in ("microsoft", "github", "google")
+             for site in ("fyberlabs", "s3rch", "windage")]
+    pairs.append(("microsoft", "hyperme"))
+    pending = []
+    for provider, site in pairs:
+        prefix = f"KC_IDP_{provider.upper()}_{site.upper()}"
+        client_id = _env(prefix + "_CLIENT_ID")
+        secret = _env(prefix + "_CLIENT_SECRET")
+        if not client_id and not secret:
+            continue
+        alias = f"{provider}-{site}"
+        if not client_id or not secret:
+            raise ConfigureError(f"Incomplete site broker credentials: {alias}")
+        current = _provider(admin, alias)
+        if current is not None:
+            # A staged alias may have since been enabled by its owning cutover.
+            # Do not overwrite it or change existing links on subsequent refresh.
+            if current.get("config", {}).get("clientId") != client_id:
+                raise ConfigureError(f"Site broker client differs: {alias}")
+            continue
+        template = _provider(admin, provider)
+        if template is None:
+            raise ConfigureError(f"Site broker template missing: {provider}")
+        expected_provider = "oidc" if provider == "microsoft" else provider
+        if template.get("providerId") != expected_provider:
+            raise ConfigureError(f"Site broker template type differs: {provider}")
+        config_keys = {
+            "authorizationUrl", "clientAuthMethod", "defaultScope", "issuer",
+            "jwksUrl", "logoutUrl", "pkceEnabled", "pkceMethod", "prompt",
+            "syncMode", "tokenUrl", "useJwksUrl", "userInfoUrl", "validateSignature",
+        }
+        config = {key: value for key, value in template.get("config", {}).items()
+                  if key in config_keys}
+        config.update(clientId=client_id, clientSecret=secret)
+        pending.append({
+            "alias": alias, "displayName": f"{provider.title()} ({site})",
+            "providerId": expected_provider, "enabled": False, "hideOnLogin": True,
+            "authenticateByDefault": False, "storeToken": False,
+            "addReadTokenRoleOnCreate": False, "trustEmail": False,
+            "firstBrokerLoginFlowAlias": template["firstBrokerLoginFlowAlias"],
+            "config": config,
+        })
+    for provider in pending:
+        admin.post("/identity-provider/instances", provider)
+        print(f"  staged disabled {provider['alias']} broker")
+
+
 def configure(admin: AdminClient) -> None:
     any_app = False
     for alias, client_env, secret_env, tenant_env in BROKERS:
@@ -249,6 +298,7 @@ def configure(admin: AdminClient) -> None:
         if client_id or client_secret:
             any_app = True
         update_broker_app(admin, alias, client_id, client_secret, tenant)
+    prepare_site_brokers(admin)
     for spec in claim_copy_mappers():
         upsert_mapper(admin, spec)
     if not any_app:
