@@ -24,7 +24,7 @@ KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak@sha256:8d44614c74798322c4e07fbe0ecb1
 def provider(tmp_path_factory):
     # No configured provider, credentials, host port or persistent volume is used.
     # Missing Docker is a failure in this explicit native lane, never a skip.
-    import os,ssl,ipaddress
+    import os,ssl,ipaddress,socket
     from datetime import datetime,timedelta,timezone
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes,serialization
@@ -51,12 +51,17 @@ def provider(tmp_path_factory):
     try:
         if not client.images.list(name=KEYCLOAK_IMAGE):
             client.images.pull(KEYCLOAK_IMAGE)
+        # Fix the allocated loopback port in Docker's binding so a fenced stop /
+        # start retains the issuer URL. Docker refuses a competing allocation.
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            canary_port = reservation.getsockname()[1]
         container = client.containers.run(KEYCLOAK_IMAGE,
             command="start-dev --https-port=8443 --https-certificate-file=/tmp/startup-cert.pem --https-certificate-key-file=/tmp/startup-key.pem --hostname-strict=false",
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
             extra_hosts={"host.docker.internal":"host-gateway"},
-            ports={"8443/tcp": ("127.0.0.1", None)},
+            ports={"8443/tcp": ("127.0.0.1", canary_port)},
             volumes={str(ROOT/"keycloak/themes/hypermesh"):{"bind":"/opt/keycloak/themes/hypermesh","mode":"ro"},str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"},str(cert_path):{"bind":"/tmp/startup-cert.pem","mode":"ro"},str(key_path):{"bind":"/tmp/startup-key.pem","mode":"ro"}}, detach=True)
         container.reload()
         binding = container.attrs["NetworkSettings"]["Ports"]["8443/tcp"][0]

@@ -3,6 +3,7 @@ import base64
 import copy
 import hashlib
 import runpy
+import sys
 import time
 import uuid
 from html.parser import HTMLParser
@@ -132,6 +133,10 @@ def test_declared_client_login_refresh_and_realm_patch_rollback(provider):
         assert C['handoff'](state, source='baseline', destination='candidate',
                             store=store, schema='same-engine', now=time.time()) == 'start'
         container.start()
+        container.reload()
+        binding = container.attrs['NetworkSettings']['Ports']['8443/tcp'][0]
+        assert binding['HostIp'] == '127.0.0.1'
+        assert int(binding['HostPort']) == urlsplit(base).port, 'Fixture issuer port changed'
         deadline = time.monotonic() + 180
         while True:
             try:
@@ -164,4 +169,7 @@ def test_declared_client_login_refresh_and_realm_patch_rollback(provider):
             with pytest.raises(C['Refused']):
                 C['compatible_realms'](baseline, candidate | {field: value}, clients)
     finally:
-        transport.delete(realm_url, headers=headers).raise_for_status()
+        # The provider fixture always removes its entire container, including
+        # this realm, after failure. Do not replace the original restart error.
+        if sys.exc_info()[0] is None:
+            transport.delete(realm_url, headers=headers).raise_for_status()
