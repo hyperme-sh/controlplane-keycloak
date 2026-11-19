@@ -83,6 +83,11 @@ def provider(tmp_path_factory):
                                     json={"realm": realm, "enabled": True})
             assert result.status_code == 201
             admin = setup.NativeAdmin.login(base, realm, "closure-provision-admin", secret)
+            # Expose only the disposable container to the CI canary contract.
+            # No host or deployed-service identifier can be supplied by a caller.
+            admin.canary_container = container
+            admin.canary_reauthenticate = lambda: setup.NativeAdmin.login(
+                base, realm, "closure-provision-admin", secret).token
             yield admin, transport, base, realm
     finally:
         if container is not None:
