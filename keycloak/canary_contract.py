@@ -27,9 +27,13 @@ def stamp(value):
 def public_keys(jwks):
     require(isinstance(jwks, dict) and isinstance(jwks.get("keys"), list), "missing JWKS")
     result = {}
+    seen = set()
     for key in jwks["keys"]:
         require(isinstance(key, dict), "invalid key")
         require(not set(key).intersection({"d", "p", "q", "dp", "dq", "qi", "k"}), "private key material")
+        kid = key.get("kid")
+        require(isinstance(kid, str) and kid and kid not in seen, "ambiguous key ID")
+        seen.add(kid)
         if key.get("use") == "enc":
             continue
         require(key.get("kty") == "RSA" and key.get("alg") == "RS256"
@@ -127,6 +131,8 @@ def handoff(state, *, source, destination, store, schema, now, max_age=60):
 The caller must hold Infra's durable unit/resource claim and write intent before
 executing. Recovery uses the same absolute desired-state check with roles reversed.
 """
+    require(type(max_age) in (int, float) and math.isfinite(max_age)
+            and 0 < max_age <= 300, "invalid fencing window")
     require(source != destination and all(isinstance(v, str) and v for v in (source, destination, store, schema)), "invalid handoff binding")
     require(state.get("store") == store and state.get("schema") == schema, "durable ownership changed")
     require(state.get("signing_owner") == store and state.get("session_owner") == store, "split durable ownership")

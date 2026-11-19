@@ -61,7 +61,7 @@ def login(transport, issuer, client, username, password):
 def claims(transport, issuer, token):
     keys = transport.get(issuer + '/protocol/openid-connect/certs').raise_for_status().json()
     kid = jwt.get_unverified_header(token)['kid']
-    key = jwt.PyJWK.from_dict(next(k for k in keys['keys'] if k['kid'] == kid))
+    key = jwt.PyJWK.from_dict(next(k for k in keys['keys'] if k['kid'] == kid and k.get('use') == 'sig' and k.get('alg') == 'RS256'))
     # Keycloak access-token audience may be account; client binding uses azp.
     return jwt.decode(token, key.key, algorithms=['RS256'], issuer=issuer,
                       options={'verify_aud': False, 'require': ['exp', 'iat', 'sub', 'iss', 'sid', 'azp']})
@@ -80,17 +80,21 @@ def test_declared_client_login_refresh_and_realm_patch_rollback(provider):
     clients = ['controlplane-frontend', 's3rch-web']
     password = uuid.uuid4().hex + uuid.uuid4().hex
     username = 'canary-' + uuid.uuid4().hex
-    baseline = {'realm': name, 'enabled': True, 'sslRequired': 'all',
-        'registrationAllowed': False, 'resetPasswordAllowed': False,
-        'clients': [{'clientId': c, 'enabled': True, 'publicClient': True,
-            'standardFlowEnabled': True, 'implicitFlowEnabled': False,
-            'directAccessGrantsEnabled': False, 'serviceAccountsEnabled': False,
-            'fullScopeAllowed': False, 'protocol': 'openid-connect',
-            'redirectUris': ['https://canary.example.invalid/' + c],
-            'attributes': {'pkce.code.challenge.method': 'S256'}} for c in clients],
-        'users': [{'username': username, 'enabled': True, 'emailVerified': True,
-            'email': username + '@example.invalid', 'firstName': 'Canary', 'lastName': 'Fixture',
-            'credentials': [{'type': 'password', 'value': password, 'temporary': False}]}]}
+    # Use the actual production renderer's scope/grant policy. Only isolated
+    # fixture bindings (realm, callbacks, enablement and user) differ.
+    render = runpy.run_path(str(ROOT / 'keycloak/production_realm.py'))['render']
+    baseline = render({'fyberlabs-web': 'https://fyberlabs.com/auth/callback',
+        'controlplane-frontend': 'https://portal.hyperme.sh/api/auth/callback/keycloak',
+        's3rch-web': 'https://s3r.ch/api/identity/oauth/callback',
+        'windage-web': 'https://tennesseewindage.com/auth/callback'})
+    baseline['realm'] = name
+    for client in baseline['clients']:
+        if client['clientId'] in clients:
+            client['enabled'] = True
+            client['redirectUris'] = ['https://canary.example.invalid/' + client['clientId']]
+    baseline['users'] = [{'username': username, 'enabled': True, 'emailVerified': True,
+        'email': username + '@example.invalid', 'firstName': 'Canary', 'lastName': 'Fixture',
+        'credentials': [{'type': 'password', 'value': password, 'temporary': False}]}]
     candidate = copy.deepcopy(baseline); candidate['displayName'] = 'Candidate patch'
     assert C['compatible_realms'](baseline, candidate, clients)
     headers = {'Authorization': 'Bearer ' + admin.token}

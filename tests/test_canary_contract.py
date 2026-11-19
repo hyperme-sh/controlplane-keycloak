@@ -97,3 +97,41 @@ def test_interrupted_start_is_absolute_and_recovery_requires_reverse_fence():
     ('schema', 'unknown'), ('schema_compatible', False), ('observed_at', 0)])
 def test_fencing_refuses_missing_or_unsafe_owner_state(field, value):
     with pytest.raises(C['Refused']): handoff(state() | {field: value})
+
+
+@pytest.mark.parametrize('window', [float('inf'), float('nan'), -1, 0, 301, True, '60'])
+def test_handoff_refuses_invalid_fencing_window(window):
+    with pytest.raises(C['Refused'], match='fencing window'):
+        handoff(state(), max_age=window)
+
+
+def test_mixed_use_key_collision_refused_in_either_order():
+    candidate = snapshot(B)
+    signing = candidate['jwks']['keys'][0]
+    encryption = signing | {'use': 'enc', 'alg': 'RSA-OAEP', 'n': 'other'}
+    for keys in ([signing, encryption], [encryption, signing]):
+        candidate['jwks']['keys'] = keys
+        with pytest.raises(C['Refused'], match='key ID'):
+            check(snapshot(A), candidate)
+
+
+def test_production_declaration_requires_binding_then_qualifies_unchanged():
+    root = Path(__file__).resolve().parents[1]
+    render = runpy.run_path(str(root / 'keycloak/production_realm.py'))['render']
+    callbacks = {'fyberlabs-web': 'https://fyberlabs.com/auth/callback',
+                 'controlplane-frontend': 'https://portal.hyperme.sh/api/auth/callback/keycloak',
+                 's3rch-web': 'https://s3r.ch/api/identity/oauth/callback',
+                 'windage-web': 'https://tennesseewindage.com/auth/callback'}
+    declared = render(callbacks)
+    names = ['controlplane-frontend', 's3rch-web']
+    with pytest.raises(C['Refused'], match='unavailable'):
+        C['compatible_realms'](declared, declared, names)
+    bound = copy.deepcopy(declared)
+    for client in bound['clients']:
+        if client['clientId'] in names:
+            client['enabled'] = True  # Isolated declared binding; never applied live.
+    assert C['compatible_realms'](bound, bound, names)
+    import json
+    development = json.loads((root / 'keycloak/import/controlplane-realm.json').read_text())
+    with pytest.raises(C['Refused'], match='authority widened'):
+        C['compatible_realms'](development, development, names)

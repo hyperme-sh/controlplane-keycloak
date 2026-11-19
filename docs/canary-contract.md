@@ -13,6 +13,12 @@ metadata; a candidate's self-report is insufficient. Missing inputs fail closed.
 Do not persist tokens, passwords, private keys, raw claims or session identifiers
 in reports. Results contain only revision/key fingerprints and boolean outcomes.
 
+The production declaration is rendered by `keycloak/production_realm.py`. Its
+clients remain disabled until the deployment owner binds them; an unbound realm
+is refused. The broader development/TEST import is not a production canary
+baseline and remains unchanged. CI derives its grant/scope policy from the
+production renderer, changing only isolated fixture bindings.
+
 The declared public clients are `controlplane-frontend` and `s3rch-web`. Each
 has a separate bounded code/PKCE login and refresh case. Consumer verification
 must check signature, algorithm, issuer and expiration before calling
