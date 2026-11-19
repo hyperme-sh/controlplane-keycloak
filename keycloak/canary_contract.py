@@ -83,6 +83,22 @@ def compatible_realms(baseline, candidate, clients):
     old_policy = {k: v for k, v in baseline.items() if k not in ignored}
     new_policy = {k: v for k, v in candidate.items() if k not in ignored}
     require(old_policy == new_policy, "realm compatibility changed")
+    declarations = []
+    for realm in (baseline, candidate):
+        entries = realm.get("clients")
+        require(isinstance(entries, list), "client declarations required")
+        mapped = {}
+        for entry in entries:
+            require(isinstance(entry, dict), "invalid client declaration")
+            name = entry.get("clientId")
+            require(isinstance(name, str) and name and name not in mapped,
+                    "ambiguous client declaration")
+            mapped[name] = entry
+        declarations.append(mapped)
+    require(declarations[0].keys() == declarations[1].keys(), "client inventory changed")
+    unselected = {k: v for k, v in declarations[0].items() if k not in clients}
+    require(unselected == {k: v for k, v in declarations[1].items() if k not in clients},
+            "unselected client policy changed")
     contracts = {}
     for name in clients:
         selected = []
@@ -92,7 +108,7 @@ def compatible_realms(baseline, candidate, clients):
             selected.append(client_contract(matches[0]))
         require(selected[0] == selected[1], "client contract changed")
         contracts[name] = selected[0]
-    return stamp({"protected": old_policy, "clients": contracts})
+    return stamp({"protected": old_policy, "clients": contracts, "unselected": unselected})
 
 
 def observed(snapshot, *, issuer, revision, now, max_age=60):

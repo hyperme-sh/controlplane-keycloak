@@ -135,3 +135,24 @@ def test_production_declaration_requires_binding_then_qualifies_unchanged():
     development = json.loads((root / 'keycloak/import/controlplane-realm.json').read_text())
     with pytest.raises(C['Refused'], match='authority widened'):
         C['compatible_realms'](development, development, names)
+
+
+@pytest.mark.parametrize('change', ['enable', 'scope', 'add', 'remove', 'duplicate'])
+def test_unselected_client_policy_cannot_bypass_compatibility(change):
+    before = realm()
+    before['clients'].append({'clientId': 'inactive', 'enabled': False, 'fullScopeAllowed': False})
+    after = copy.deepcopy(before)
+    if change == 'enable': after['clients'][1]['enabled'] = True
+    if change == 'scope': after['clients'][1]['fullScopeAllowed'] = True
+    if change == 'add': after['clients'].append({'clientId': 'other'})
+    if change == 'remove': after['clients'].pop()
+    if change == 'duplicate': after['clients'].append(copy.deepcopy(after['clients'][1]))
+    with pytest.raises(C['Refused']): C['compatible_realms'](before, after, ['declared'])
+
+
+def test_unchanged_disabled_clients_remain_compatible_and_affect_fingerprint():
+    before = realm(); before['clients'].append({'clientId': 'inactive', 'enabled': False})
+    first = C['compatible_realms'](before, before, ['declared'])
+    after = copy.deepcopy(before); after['clients'][1]['description'] = 'new owner declaration'
+    second = C['compatible_realms'](after, after, ['declared'])
+    assert first != second
