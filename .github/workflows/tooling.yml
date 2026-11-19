@@ -18,10 +18,11 @@ jobs:
         with:
           version: '0.11.26'
           python-version: '3.13'
-      - name: Install Java provider build tools
+      - name: Install verified Java and Maven distributions
+        timeout-minutes: 12
         run: |
-          sudo apt-get update
-          sudo apt-get install -y openjdk-21-jdk-headless maven
+          bash scripts/install-java.sh
+          bash scripts/install-maven.sh
       - run: bash scripts/check-tooling.sh
       - name: Qualify native closure tooling in a disposable realm
         run: bash scripts/check-native.sh
