@@ -396,6 +396,16 @@ configuration and preceding owner-result files. Credentials are never returned.
 No package version or release authorization changes are implied.
 
 
+## Authenticator enrollment labels
+
+The startup provider JAR includes the optional `tenant-otp-freemarker` login
+forms provider. When enabled with its `tenant-labels` option, it reads the
+administrator-managed client attribute `startup.otp.label.<callback-host>`.
+The callback must be an exact HTTPS redirect registered on the current OIDC
+client. Infra owns the product and environment values. A missing mapping
+uses the realm's configured label. This setting applies when Keycloak issues
+new authenticator setup details for the current sign-in.
+
 ## Optional Hypermesh login theme
 
 `keycloak/themes/hypermesh` extends Keycloak's `keycloak.v2` login theme and

@@ -3,33 +3,43 @@ package sh.hyperme.startup;
 import jakarta.ws.rs.core.Response;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
+import java.net.URI;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import org.keycloak.forms.login.freemarker.FreeMarkerLoginFormsProvider;
 import org.keycloak.forms.login.freemarker.model.TotpBean;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.theme.Theme;
 
-/** Use the configured tenant display name in the QR code for a bound account. */
+/** Brand enrollment from the product origin registered on the OIDC client. */
 final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
-    private static final String LABEL_PREFIX = "startup.otp.tenant.";
-
     TenantOtpLoginForms(KeycloakSession session) {
         super(session);
     }
 
-    static String labelAttribute(String clientId, String subject) {
-        if (clientId == null || !clientId.matches("[a-zA-Z0-9_-]{1,128}")
-                || subject == null || !subject.matches("[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}")) {
+    static String productLabel(String callback, Set<String> redirectUris, Map<String, String> clientAttributes) {
+        if (callback == null || redirectUris == null || !redirectUris.contains(callback) || clientAttributes == null) {
             return null;
         }
-        return LABEL_PREFIX + clientId + "." + subject;
-    }
-
-    static boolean validLabel(String label) {
-        return label != null && !label.isBlank() && label.equals(label.strip())
-            && label.length() <= 128 && label.codePoints().noneMatch(cp ->
-                cp == ':' || cp == '/' || Character.isISOControl(cp));
+        URI uri;
+        try {
+            uri = URI.create(callback);
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
+        String host = uri.getHost();
+        if (!"https".equals(uri.getScheme()) || host == null || callback.contains("*")
+                || !host.equals(uri.getRawAuthority()) || uri.getRawFragment() != null) {
+            return null;
+        }
+        String label = clientAttributes.get("startup.otp.label." + host.toLowerCase(Locale.ROOT));
+        if (label == null || label.isBlank() || label.indexOf(':') >= 0 || label.indexOf('/') >= 0
+                || label.codePoints().anyMatch(Character::isISOControl)) {
+            return null;
+        }
+        return label.strip();
     }
 
     static RealmModel labelledRealm(RealmModel original, String label) {
@@ -53,9 +63,10 @@ final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
                 && authenticationSession.getAuthenticatedUser() != null
                 && user.getId().equals(authenticationSession.getAuthenticatedUser().getId())
                 && attributes.get("totp") instanceof TotpBean totp) {
-            String attribute = labelAttribute(authenticationSession.getClient().getClientId(), user.getId());
-            String label = attribute == null ? null : realm.getAttribute(attribute);
-            if (validLabel(label)) {
+            var client = authenticationSession.getClient();
+            String label = productLabel(authenticationSession.getRedirectUri(),
+                client.getRedirectUris(), client.getAttributes());
+            if (label != null) {
                 var uri = uriInfo.getBaseUriBuilder().path(uriInfo.getPath())
                     .replaceQuery(uriInfo.getRequestUri().getQuery());
                 attributes.put("totp", new TotpBean(session, labelledRealm(realm, label), user,
