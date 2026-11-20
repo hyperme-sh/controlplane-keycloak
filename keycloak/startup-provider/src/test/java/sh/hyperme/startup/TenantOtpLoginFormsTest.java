@@ -2,6 +2,7 @@ package sh.hyperme.startup;
 
 import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.keycloak.Config;
 import org.keycloak.models.OTPPolicy;
@@ -27,25 +28,31 @@ final class TenantOtpLoginFormsTest {
     }
 
     @Test
-    void onlyAnExactClientAndSubjectCanNameALabel() {
-        String subject = "00000000-0000-4000-8000-000000000001";
-        assertEquals("startup.otp.tenant.s3rch-web." + subject,
-            TenantOtpLoginForms.labelAttribute("s3rch-web", subject));
-        assertNotEquals(TenantOtpLoginForms.labelAttribute("s3rch-web", subject),
-            TenantOtpLoginForms.labelAttribute("controlplane-frontend", subject));
-        assertNull(TenantOtpLoginForms.labelAttribute("s3rch-web.other", subject));
-        assertNull(TenantOtpLoginForms.labelAttribute("s3rch-web", "by-email@example.invalid"));
-        assertNull(TenantOtpLoginForms.labelAttribute(null, subject));
-        assertTrue(TenantOtpLoginForms.validLabel("hyperme.sh TEST"));
-        assertTrue(TenantOtpLoginForms.validLabel("s3r.ch TEST"));
-        assertFalse(TenantOtpLoginForms.validLabel("hyperme.sh:TEST"));
-        assertFalse(TenantOtpLoginForms.validLabel("s3r.ch / TEST"));
-        assertFalse(TenantOtpLoginForms.validLabel("s3r.ch\nTEST"));
-        assertFalse(TenantOtpLoginForms.validLabel(null));
+    void productLabelUsesTheRegisteredCallbackAndClientAcrossAllFourEnvironments() {
+        assertProductLabel("s3rch-web", "https://test.s3r.ch/api/identity/oauth/callback", "test.s3r.ch");
+        assertProductLabel("s3rch-web", "https://s3r.ch/api/identity/oauth/callback", "s3r.ch");
+        assertProductLabel("s3rch-web", "https://www.s3r.ch/api/identity/oauth/callback", "s3r.ch");
+        assertProductLabel("controlplane-frontend", "https://portal.test.hyperme.sh/api/auth/callback/keycloak",
+            "test.hyperme.sh");
+        assertProductLabel("controlplane-frontend", "https://portal.hyperme.sh/api/auth/callback/keycloak",
+            "hyperme.sh");
+
+        String callback = "https://test.s3r.ch/api/identity/oauth/callback";
+        assertNull(TenantOtpLoginForms.productLabel("controlplane-frontend", callback, Set.of(callback)));
+        assertNull(TenantOtpLoginForms.productLabel("s3rch-web", callback, Set.of("https://test.s3r.ch/*")));
+        assertProductLabel("s3rch-web", "https://test.s3r.ch.evil.invalid/api/identity/oauth/callback", null);
+        assertProductLabel("s3rch-web", "https://test.hyperme.sh@test.s3r.ch/api/identity/oauth/callback", null);
+        assertProductLabel("s3rch-web", "http://test.s3r.ch/api/identity/oauth/callback", null);
+        assertProductLabel("s3rch-web", "https://test.s3r.ch:8443/api/identity/oauth/callback", null);
+        assertNull(TenantOtpLoginForms.productLabel("s3rch-web", null, Set.of(callback)));
+    }
+
+    private static void assertProductLabel(String clientId, String callback, String expected) {
+        assertEquals(expected, TenantOtpLoginForms.productLabel(clientId, callback, Set.of(callback)));
     }
 
     @Test
-    void upstreamOtpPolicyChangesOnlyTheLabelAndIssuerForTheBoundTenant() {
+    void upstreamOtpPolicyChangesOnlyTheLabelAndIssuerForTheProduct() {
         RealmModel original = (RealmModel) Proxy.newProxyInstance(RealmModel.class.getClassLoader(),
             new Class<?>[] {RealmModel.class}, (proxy, method, args) -> switch (method.getName()) {
                 case "getDisplayName" -> null;
@@ -59,8 +66,8 @@ final class TenantOtpLoginFormsTest {
                 return "member";
             });
 
-        RealmModel branded = TenantOtpLoginForms.labelledRealm(original, "hyperme.sh TEST");
-        RealmModel other = TenantOtpLoginForms.labelledRealm(original, "s3r.ch TEST");
+        RealmModel branded = TenantOtpLoginForms.labelledRealm(original, "test.s3r.ch");
+        RealmModel other = TenantOtpLoginForms.labelledRealm(original, "test.hyperme.sh");
         assertEquals("controlplane", branded.getName());
         assertSame(original.getOTPPolicy(), branded.getOTPPolicy());
 
@@ -69,9 +76,9 @@ final class TenantOtpLoginFormsTest {
         URI after = URI.create(branded.getOTPPolicy().getKeyURI(branded, user, synthetic));
         URI otherTenant = URI.create(other.getOTPPolicy().getKeyURI(other, user, synthetic));
         assertEquals("/controlplane:member", before.getPath());
-        assertEquals("/hyperme.sh TEST:member", after.getPath());
-        assertEquals("/s3r.ch TEST:member", otherTenant.getPath());
-        assertEquals(before.getRawQuery().replace("issuer=controlplane", "issuer=hyperme.sh%20TEST"),
+        assertEquals("/test.s3r.ch:member", after.getPath());
+        assertEquals("/test.hyperme.sh:member", otherTenant.getPath());
+        assertEquals(before.getRawQuery().replace("issuer=controlplane", "issuer=test.s3r.ch"),
             after.getRawQuery());
         assertNull(original.getDisplayName());
     }
