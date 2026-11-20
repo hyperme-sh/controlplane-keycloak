@@ -406,6 +406,13 @@ client. Infra owns the product and environment values. A missing mapping
 uses the realm's configured label. This setting applies when Keycloak issues
 new authenticator setup details for the current sign-in.
 
+The successful default-branch tooling workflow uploads the tested JAR in
+the `keycloak-test-provider` artifact, with its source revision and checksums.
+After installing the JAR in Keycloak's provider directory, configure
+`spi-login--tenant-otp-freemarker--tenant-labels=true` and
+`spi-login--provider-default=tenant-otp-freemarker` for the server. The
+disposable CI realm checks startup with those options enabled.
+
 ## Optional Hypermesh login theme
 
 `keycloak/themes/hypermesh` extends Keycloak's `keycloak.v2` login theme and

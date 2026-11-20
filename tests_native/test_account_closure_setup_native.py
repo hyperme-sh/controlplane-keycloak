@@ -57,7 +57,10 @@ def provider(tmp_path_factory):
             reservation.bind(("127.0.0.1", 0))
             canary_port = reservation.getsockname()[1]
         container = client.containers.run(KEYCLOAK_IMAGE,
-            command="start-dev --https-port=8443 --https-certificate-file=/tmp/startup-cert.pem --https-certificate-key-file=/tmp/startup-key.pem --hostname-strict=false",
+            command=["start-dev", "--https-port=8443", "--https-certificate-file=/tmp/startup-cert.pem",
+                     "--https-certificate-key-file=/tmp/startup-key.pem", "--hostname-strict=false",
+                     "--spi-login--tenant-otp-freemarker--tenant-labels=true",
+                     "--spi-login--provider-default=tenant-otp-freemarker"],
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
             extra_hosts={"host.docker.internal":"host-gateway"},
