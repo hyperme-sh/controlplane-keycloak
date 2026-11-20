@@ -57,8 +57,11 @@ def provider(tmp_path_factory):
             reservation.bind(("127.0.0.1", 0))
             canary_port = reservation.getsockname()[1]
         container = client.containers.run(KEYCLOAK_IMAGE,
-            command="start-dev --https-port=8443 --https-certificate-file=/tmp/startup-cert.pem --https-certificate-key-file=/tmp/startup-key.pem --hostname-strict=false",
+            command=["start-dev", "--https-port=8443", "--https-certificate-file=/tmp/startup-cert.pem",
+                     "--https-certificate-key-file=/tmp/startup-key.pem", "--hostname-strict=false",
+                     "--spi-login--provider-default=tenant-otp-freemarker"],
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
+                         "KEYCLOAK_OTP_LABELS_ENABLED": "true",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
             extra_hosts={"host.docker.internal":"host-gateway"},
             ports={"8443/tcp": ("127.0.0.1", canary_port)},
@@ -70,6 +73,10 @@ def provider(tmp_path_factory):
         with httpx.Client(base_url=base, timeout=15, trust_env=False, follow_redirects=False,verify=context) as transport:
             deadline = time.monotonic() + 180
             while True:
+                container.reload()
+                if container.status in {"exited", "dead"}:
+                    log = container.logs(tail=20).decode(errors="replace").replace(secret, "[fixture password]")
+                    raise AssertionError("Disposable Keycloak exited during startup\n" + log)
                 try:
                     ready = transport.get("/realms/master/.well-known/openid-configuration")
                     if ready.status_code == 200:

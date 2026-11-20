@@ -26,3 +26,18 @@ jobs:
       - run: bash scripts/check-tooling.sh
       - name: Qualify native closure tooling in a disposable realm
         run: bash scripts/check-native.sh
+      - name: Collect the tested TEST provider
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/keycloak-test-provider"
+          mkdir "$output"
+          cp keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar "$output/startup-provider.jar"
+          git rev-parse HEAD > "$output/revision"
+          (cd "$output" && sha256sum startup-provider.jar revision > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: keycloak-test-provider
+          path: ${{ runner.temp }}/keycloak-test-provider/
+          retention-days: 30
+          if-no-files-found: error
