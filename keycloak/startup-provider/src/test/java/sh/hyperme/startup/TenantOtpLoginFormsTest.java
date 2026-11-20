@@ -2,6 +2,7 @@ package sh.hyperme.startup;
 
 import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.keycloak.Config;
@@ -28,27 +29,34 @@ final class TenantOtpLoginFormsTest {
     }
 
     @Test
-    void productLabelUsesTheRegisteredCallbackAndClientAcrossAllFourEnvironments() {
-        assertProductLabel("s3rch-web", "https://test.s3r.ch/api/identity/oauth/callback", "test.s3r.ch");
-        assertProductLabel("s3rch-web", "https://s3r.ch/api/identity/oauth/callback", "s3r.ch");
-        assertProductLabel("s3rch-web", "https://www.s3r.ch/api/identity/oauth/callback", "s3r.ch");
-        assertProductLabel("controlplane-frontend", "https://portal.test.hyperme.sh/api/auth/callback/keycloak",
-            "test.hyperme.sh");
-        assertProductLabel("controlplane-frontend", "https://portal.hyperme.sh/api/auth/callback/keycloak",
-            "hyperme.sh");
-
-        String callback = "https://test.s3r.ch/api/identity/oauth/callback";
-        assertNull(TenantOtpLoginForms.productLabel("controlplane-frontend", callback, Set.of(callback)));
-        assertNull(TenantOtpLoginForms.productLabel("s3rch-web", callback, Set.of("https://test.s3r.ch/*")));
-        assertProductLabel("s3rch-web", "https://test.s3r.ch.evil.invalid/api/identity/oauth/callback", null);
-        assertProductLabel("s3rch-web", "https://test.hyperme.sh@test.s3r.ch/api/identity/oauth/callback", null);
-        assertProductLabel("s3rch-web", "http://test.s3r.ch/api/identity/oauth/callback", null);
-        assertProductLabel("s3rch-web", "https://test.s3r.ch:8443/api/identity/oauth/callback", null);
-        assertNull(TenantOtpLoginForms.productLabel("s3rch-web", null, Set.of(callback)));
+    void productLabelUsesTheMappingOnTheCurrentClient() {
+        String callback = "https://portal.test.hyperme.sh/api/auth/callback/keycloak";
+        Set<String> redirects = Set.of(callback);
+        String key = "startup.otp.label.portal.test.hyperme.sh";
+        assertEquals("test.hyperme.sh",
+            TenantOtpLoginForms.productLabel(callback, redirects, Map.of(key, "test.hyperme.sh")));
+        assertEquals("Tenant A",
+            TenantOtpLoginForms.productLabel(callback, redirects, Map.of(key, "Tenant A")));
+        assertNull(TenantOtpLoginForms.productLabel(callback, redirects, Map.of()));
+        assertNull(TenantOtpLoginForms.productLabel(callback, redirects, Map.of(key, "other:account")));
     }
 
-    private static void assertProductLabel(String clientId, String callback, String expected) {
-        assertEquals(expected, TenantOtpLoginForms.productLabel(clientId, callback, Set.of(callback)));
+    @Test
+    void productLabelRequiresAnExactRegisteredHttpsRedirect() {
+        String callback = "https://test.s3r.ch/api/identity/oauth/callback";
+        Map<String, String> mapping = Map.of("startup.otp.label.test.s3r.ch", "test.s3r.ch");
+        assertEquals("test.s3r.ch", TenantOtpLoginForms.productLabel(callback, Set.of(callback), mapping));
+        assertNull(TenantOtpLoginForms.productLabel(callback, Set.of("https://test.s3r.ch/*"), mapping));
+        assertNull(TenantOtpLoginForms.productLabel(null, Set.of(callback), mapping));
+        for (String invalid : Set.of(
+                "https://test.s3r.ch/*",
+                "https://test.s3r.ch.evil.invalid/api/identity/oauth/callback",
+                "https://test.hyperme.sh@test.s3r.ch/api/identity/oauth/callback",
+                "http://test.s3r.ch/api/identity/oauth/callback",
+                "https://test.s3r.ch:8443/api/identity/oauth/callback",
+                callback + "#fragment")) {
+            assertNull(TenantOtpLoginForms.productLabel(invalid, Set.of(invalid), mapping), invalid);
+        }
     }
 
     @Test

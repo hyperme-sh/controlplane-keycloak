@@ -5,6 +5,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import org.keycloak.forms.login.freemarker.FreeMarkerLoginFormsProvider;
 import org.keycloak.forms.login.freemarker.model.TotpBean;
@@ -18,33 +19,27 @@ final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
         super(session);
     }
 
-    static String productLabel(String clientId, String callback, Set<String> redirectUris) {
-        if (clientId == null || callback == null || redirectUris == null || !redirectUris.contains(callback)) {
+    static String productLabel(String callback, Set<String> redirectUris, Map<String, String> clientAttributes) {
+        if (callback == null || redirectUris == null || !redirectUris.contains(callback) || clientAttributes == null) {
             return null;
         }
+        URI uri;
         try {
-            URI uri = URI.create(callback);
-            String host = uri.getHost();
-            if (!"https".equals(uri.getScheme()) || host == null
-                    || !host.equals(uri.getRawAuthority()) || uri.getRawFragment() != null) {
-                return null;
-            }
-            return switch (clientId) {
-                case "s3rch-web" -> switch (host) {
-                    case "s3r.ch", "www.s3r.ch" -> "s3r.ch";
-                    case "test.s3r.ch" -> "test.s3r.ch";
-                    default -> null;
-                };
-                case "controlplane-frontend" -> switch (host) {
-                    case "hyperme.sh", "www.hyperme.sh", "portal.hyperme.sh" -> "hyperme.sh";
-                    case "test.hyperme.sh", "portal.test.hyperme.sh" -> "test.hyperme.sh";
-                    default -> null;
-                };
-                default -> null;
-            };
+            uri = URI.create(callback);
         } catch (IllegalArgumentException error) {
             return null;
         }
+        String host = uri.getHost();
+        if (!"https".equals(uri.getScheme()) || host == null || callback.contains("*")
+                || !host.equals(uri.getRawAuthority()) || uri.getRawFragment() != null) {
+            return null;
+        }
+        String label = clientAttributes.get("startup.otp.label." + host.toLowerCase(Locale.ROOT));
+        if (label == null || label.isBlank() || label.indexOf(':') >= 0 || label.indexOf('/') >= 0
+                || label.codePoints().anyMatch(Character::isISOControl)) {
+            return null;
+        }
+        return label.strip();
     }
 
     static RealmModel labelledRealm(RealmModel original, String label) {
@@ -69,8 +64,8 @@ final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
                 && user.getId().equals(authenticationSession.getAuthenticatedUser().getId())
                 && attributes.get("totp") instanceof TotpBean totp) {
             var client = authenticationSession.getClient();
-            String label = productLabel(client.getClientId(), authenticationSession.getRedirectUri(),
-                client.getRedirectUris());
+            String label = productLabel(authenticationSession.getRedirectUri(),
+                client.getRedirectUris(), client.getAttributes());
             if (label != null) {
                 var uri = uriInfo.getBaseUriBuilder().path(uriInfo.getPath())
                     .replaceQuery(uriInfo.getRequestUri().getQuery());
