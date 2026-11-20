@@ -73,6 +73,10 @@ def provider(tmp_path_factory):
         with httpx.Client(base_url=base, timeout=15, trust_env=False, follow_redirects=False,verify=context) as transport:
             deadline = time.monotonic() + 180
             while True:
+                container.reload()
+                if container.status in {"exited", "dead"}:
+                    log = container.logs(tail=20).decode(errors="replace").replace(secret, "[fixture password]")
+                    raise AssertionError("Disposable Keycloak exited during startup\n" + log)
                 try:
                     ready = transport.get("/realms/master/.well-known/openid-configuration")
                     if ready.status_code == 200:
