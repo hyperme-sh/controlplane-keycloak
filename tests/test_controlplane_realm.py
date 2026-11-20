@@ -616,6 +616,27 @@ def test_s3rch_web_upsert_is_idempotent() -> None:
     assert optional_names == set()
 
 
+def test_s3rch_broker_reconciliation_preserves_approved_otp_labels() -> None:
+    module = _s3rch_module()
+    admin = _FakeKeycloak()
+    realm = _realm()
+    declared = module.declared_client(realm)
+    declared["attributes"]["startup.otp.label.s3r.ch"] = "s3r.ch"
+    module.ensure_s3rch_web(admin, realm)
+    attrs = admin.clients[0]["attributes"]
+    assert attrs["startup.otp.label.s3r.ch"] == "s3r.ch"
+    attrs["startup.otp.label.s3r.ch"] = "old label"
+    attrs["startup.otp.label.test.s3r.ch"] = "test.s3r.ch"
+    attrs["startup.otp.label.other.example"] = "foreign label"
+    attrs["startup.otp.label.www.s3r.ch"] = "invalid:label"
+    module.ensure_s3rch_web(admin, realm)
+    attrs = admin.clients[0]["attributes"]
+    assert attrs["startup.otp.label.s3r.ch"] == "s3r.ch"
+    assert attrs["startup.otp.label.test.s3r.ch"] == "test.s3r.ch"
+    assert attrs["startup.otp.label.other.example"] is None
+    assert attrs["startup.otp.label.www.s3r.ch"] is None
+
+
 def test_s3rch_web_corrects_drift_and_keeps_other_clients() -> None:
     module = _s3rch_module()
     admin = _FakeKeycloak()

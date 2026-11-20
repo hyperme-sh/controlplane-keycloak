@@ -51,6 +51,10 @@ OPTIONAL_CLIENT_SCOPES: tuple[str, ...] = ()
 DECLARED_ATTRIBUTES = {
     "pkce.code.challenge.method": "S256",
 }
+OTP_LABEL_ATTRIBUTES = {
+    f"startup.otp.label.{urlparse(uri).hostname}" for uri in REDIRECT_URIS
+    if uri.startswith("https://")
+}
 
 CLEARED_ATTRIBUTES = (
     "client.offline.session.idle.timeout",
@@ -82,6 +86,15 @@ def declared_protocol_mappers(realm: dict[str, Any] | None = None) -> list[dict[
     return token_claim_mappers()
 
 
+def valid_otp_label(key: str, value: Any) -> bool:
+    return (
+        key in OTP_LABEL_ATTRIBUTES
+        and isinstance(value, str)
+        and bool(value.strip())
+        and all(not (c in ":/" or ord(c) < 32 or 127 <= ord(c) <= 159) for c in value)
+    )
+
+
 def validate_declared_client(client: dict[str, Any], realm: dict[str, Any] | None = None) -> None:
     """Fail closed if the realm file drifts from the s3r.ch backup contract."""
     if client.get("clientId") != CLIENT_ID:
@@ -101,7 +114,8 @@ def validate_declared_client(client: dict[str, Any], realm: dict[str, Any] | Non
     if client.get("fullScopeAllowed") is not False:
         raise S3rchClientError(f"{CLIENT_ID} must not allow undeclared scopes")
     attrs = client.get("attributes") or {}
-    if attrs != DECLARED_ATTRIBUTES:
+    if {key: value for key, value in attrs.items()
+            if not valid_otp_label(key, value)} != DECLARED_ATTRIBUTES:
         raise S3rchClientError(f"{CLIENT_ID} attributes must be the declared set")
     redirects = list(client.get("redirectUris") or [])
     if redirects != list(REDIRECT_URIS):
@@ -142,9 +156,8 @@ def validate_declared_client(client: dict[str, Any], realm: dict[str, Any] | Non
 def upsert_payload(declared: dict[str, Any], existing: dict[str, Any] | None) -> dict[str, Any]:
     """Representation for create or update. Preserves the Keycloak id.
 
-    Attributes are the declared set, not a merge. Keys that exist only on the
-    live client are set to null so a hand edit cannot keep device grant,
-    a longer session, or a secret. No secret is copied forward.
+    Keep administrator-managed OTP labels for approved HTTPS callbacks.
+    Clear other undeclared attributes, including session and device grants.
     """
     payload = json.loads(json.dumps(declared))
     payload.pop("secret", None)
@@ -154,9 +167,9 @@ def upsert_payload(declared: dict[str, Any], existing: dict[str, Any] | None) ->
         if not existing.get("id"):
             raise S3rchClientError(f"{CLIENT_ID} update is missing the Keycloak id")
         payload["id"] = existing["id"]
-        for key in existing.get("attributes") or {}:
+        for key, value in (existing.get("attributes") or {}).items():
             if key not in attrs:
-                attrs[key] = None
+                attrs[key] = value if valid_otp_label(key, value) else None
     for key in CLEARED_ATTRIBUTES:
         attrs[key] = None
     payload["attributes"] = attrs
