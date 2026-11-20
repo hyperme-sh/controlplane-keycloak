@@ -5,7 +5,6 @@ import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import org.keycloak.Config;
 import org.keycloak.models.OTPPolicy;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
@@ -16,15 +15,9 @@ final class TenantOtpLoginFormsTest {
     @Test
     void installingTheStartupArtifactDoesNotSelectTheRenderer() {
         TenantOtpLoginFormsFactory renderer = new TenantOtpLoginFormsFactory();
-        for (boolean optIn : new boolean[] {false, true}) {
-            Config.Scope config = (Config.Scope) Proxy.newProxyInstance(Config.Scope.class.getClassLoader(),
-                new Class<?>[] {Config.Scope.class}, (proxy, method, args) -> {
-                    assertEquals("getBoolean", method.getName());
-                    assertArrayEquals(new Object[] {"tenant-labels", false}, args);
-                    return optIn;
-                });
-            assertEquals(optIn, renderer.isSupported(config));
-        }
+        assertFalse(TenantOtpLoginFormsFactory.labelsEnabled(null));
+        assertFalse(TenantOtpLoginFormsFactory.labelsEnabled("false"));
+        assertTrue(TenantOtpLoginFormsFactory.labelsEnabled("true"));
         assertTrue(renderer.order() > 0);
     }
 

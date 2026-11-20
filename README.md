@@ -399,7 +399,7 @@ No package version or release authorization changes are implied.
 ## Authenticator enrollment labels
 
 The startup provider JAR includes the optional `tenant-otp-freemarker` login
-forms provider. When enabled with its `tenant-labels` option, it reads the
+forms provider. When enabled with `KEYCLOAK_OTP_LABELS_ENABLED=true`, it reads the
 administrator-managed client attribute `startup.otp.label.<callback-host>`.
 The callback must be an exact HTTPS redirect registered on the current OIDC
 client. Infra owns the product and environment values. A missing mapping
@@ -408,10 +408,10 @@ new authenticator setup details for the current sign-in.
 
 The successful default-branch tooling workflow uploads the tested JAR in
 the `keycloak-test-provider` artifact, with its source revision and checksums.
-After installing the JAR in Keycloak's provider directory, configure
-`spi-login--tenant-otp-freemarker--tenant-labels=true` and
-`spi-login--provider-default=tenant-otp-freemarker` for the server. The
-disposable CI realm checks startup with those options enabled.
+After installing the JAR in Keycloak's provider directory, set
+`KEYCLOAK_OTP_LABELS_ENABLED=true` in the build and server environment.
+Select the provider with `spi-login--provider-default=tenant-otp-freemarker`.
+The disposable CI realm checks startup with that provider selected.
 
 ## Optional Hypermesh login theme
 
