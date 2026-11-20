@@ -3,6 +3,7 @@ package sh.hyperme.startup;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import org.junit.jupiter.api.Test;
+import org.keycloak.Config;
 import org.keycloak.models.OTPPolicy;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
@@ -10,6 +11,21 @@ import org.keycloak.models.UserModel;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class TenantOtpLoginFormsTest {
+    @Test
+    void installingTheStartupArtifactDoesNotSelectTheRenderer() {
+        TenantOtpLoginFormsFactory renderer = new TenantOtpLoginFormsFactory();
+        for (boolean optIn : new boolean[] {false, true}) {
+            Config.Scope config = (Config.Scope) Proxy.newProxyInstance(Config.Scope.class.getClassLoader(),
+                new Class<?>[] {Config.Scope.class}, (proxy, method, args) -> {
+                    assertEquals("getBoolean", method.getName());
+                    assertArrayEquals(new Object[] {"tenant-labels", false}, args);
+                    return optIn;
+                });
+            assertEquals(optIn, renderer.isSupported(config));
+        }
+        assertTrue(renderer.order() > 0);
+    }
+
     @Test
     void onlyAnExactClientAndSubjectCanNameALabel() {
         String subject = "00000000-0000-4000-8000-000000000001";
