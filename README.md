@@ -411,7 +411,9 @@ the `keycloak-test-provider` artifact, with its source revision and checksums.
 After installing the JAR in Keycloak's provider directory, set
 `KEYCLOAK_OTP_LABELS_ENABLED=true` in the build and server environment.
 Select the provider with `spi-login--provider-default=tenant-otp-freemarker`.
-The disposable CI realm checks startup with that provider selected.
+An existing TEST container can instead use the regular file
+`/opt/keycloak/conf/startup-otp-labels.enabled` as its opt-in. This
+allows the TEST controller to keep the original container configuration.
 
 ## Optional Hypermesh login theme
 
