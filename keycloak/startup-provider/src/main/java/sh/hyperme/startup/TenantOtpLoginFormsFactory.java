@@ -1,5 +1,8 @@
 package sh.hyperme.startup;
 
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import org.keycloak.Config;
 import org.keycloak.forms.login.LoginFormsProvider;
 import org.keycloak.forms.login.freemarker.FreeMarkerLoginFormsProviderFactory;
@@ -9,6 +12,7 @@ import org.keycloak.provider.EnvironmentDependentProviderFactory;
 /** Opt-in login renderer for tenant-labelled authenticator enrollment. */
 public final class TenantOtpLoginFormsFactory extends FreeMarkerLoginFormsProviderFactory
         implements EnvironmentDependentProviderFactory {
+    private static final Path OPT_IN = Path.of("/opt/keycloak/conf/startup-otp-labels.enabled");
     @Override
     public String getId() {
         return "tenant-otp-freemarker";
@@ -16,7 +20,8 @@ public final class TenantOtpLoginFormsFactory extends FreeMarkerLoginFormsProvid
 
     @Override
     public boolean isSupported(Config.Scope config) {
-        return labelsEnabled(System.getenv("KEYCLOAK_OTP_LABELS_ENABLED"));
+        return labelsEnabled(System.getenv("KEYCLOAK_OTP_LABELS_ENABLED"))
+                || Files.isRegularFile(OPT_IN, LinkOption.NOFOLLOW_LINKS);
     }
 
     static boolean labelsEnabled(String setting) {

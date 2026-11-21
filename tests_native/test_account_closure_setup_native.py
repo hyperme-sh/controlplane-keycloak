@@ -39,6 +39,8 @@ def provider(tmp_path_factory):
         .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address('127.0.0.1'))]),critical=False)
         .sign(key,hashes.SHA256()))
     cert_path=directory/'cert.pem';key_path=directory/'key.pem'
+    opt_in = directory / 'startup-otp-labels.enabled'
+    opt_in.touch(mode=0o644)
     cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
     key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
     cert_path.chmod(0o644);key_path.chmod(0o644)
@@ -58,14 +60,12 @@ def provider(tmp_path_factory):
             canary_port = reservation.getsockname()[1]
         container = client.containers.run(KEYCLOAK_IMAGE,
             command=["start-dev", "--https-port=8443", "--https-certificate-file=/tmp/startup-cert.pem",
-                     "--https-certificate-key-file=/tmp/startup-key.pem", "--hostname-strict=false",
-                     "--spi-login--provider-default=tenant-otp-freemarker"],
+                     "--https-certificate-key-file=/tmp/startup-key.pem", "--hostname-strict=false"],
             environment={"KC_BOOTSTRAP_ADMIN_USERNAME": "closure-provision-admin",
-                         "KEYCLOAK_OTP_LABELS_ENABLED": "true",
                          "KC_BOOTSTRAP_ADMIN_PASSWORD": secret},
             extra_hosts={"host.docker.internal":"host-gateway"},
             ports={"8443/tcp": ("127.0.0.1", canary_port)},
-            volumes={str(ROOT/"keycloak/themes/hypermesh"):{"bind":"/opt/keycloak/themes/hypermesh","mode":"ro"},str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"},str(cert_path):{"bind":"/tmp/startup-cert.pem","mode":"ro"},str(key_path):{"bind":"/tmp/startup-key.pem","mode":"ro"}}, detach=True)
+            volumes={str(ROOT/"keycloak/themes/hypermesh"):{"bind":"/opt/keycloak/themes/hypermesh","mode":"ro"},str(ROOT/"keycloak/startup-provider/target/startup-entra-provider-0.1.0.jar"):{"bind":"/opt/keycloak/providers/startup-entra.jar","mode":"ro"},str(cert_path):{"bind":"/tmp/startup-cert.pem","mode":"ro"},str(key_path):{"bind":"/tmp/startup-key.pem","mode":"ro"},str(opt_in):{"bind":"/opt/keycloak/conf/startup-otp-labels.enabled","mode":"ro"}}, detach=True)
         container.reload()
         binding = container.attrs["NetworkSettings"]["Ports"]["8443/tcp"][0]
         assert binding["HostIp"] == "127.0.0.1"
