@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.keycloak.forms.login.freemarker.model.RealmBean;
 import org.keycloak.models.OTPPolicy;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
@@ -73,6 +74,7 @@ final class TenantOtpLoginFormsTest {
             new Class<?>[] {RealmModel.class}, (proxy, method, args) -> switch (method.getName()) {
                 case "getDisplayName" -> null;
                 case "getName" -> "controlplane";
+                case "getDisplayNameHtml" -> "Internal realm";
                 case "getOTPPolicy" -> OTPPolicy.DEFAULT_POLICY;
                 default -> throw new AssertionError(method.getName());
             });
@@ -84,7 +86,14 @@ final class TenantOtpLoginFormsTest {
 
         RealmModel branded = TenantOtpLoginForms.labelledRealm(original, "test.s3r.ch");
         RealmModel other = TenantOtpLoginForms.labelledRealm(original, "test.hyperme.sh");
-        assertEquals("controlplane", branded.getName());
+        assertTrue(TenantOtpLoginForms.isOtpTemplate("login-config-totp.ftl"));
+        assertTrue(TenantOtpLoginForms.isOtpTemplate("login-otp.ftl"));
+        assertFalse(TenantOtpLoginForms.isOtpTemplate("login.ftl"));
+        RealmBean page = new RealmBean(branded);
+        assertEquals("test.s3r.ch", page.getDisplayName());
+        assertEquals("test.s3r.ch", page.getDisplayNameHtml());
+        assertEquals("controlplane", page.getName());
+        assertEquals("Internal realm", original.getDisplayNameHtml());
         assertSame(original.getOTPPolicy(), branded.getOTPPolicy());
 
         String synthetic = "synthetic-unit-test-secret";
