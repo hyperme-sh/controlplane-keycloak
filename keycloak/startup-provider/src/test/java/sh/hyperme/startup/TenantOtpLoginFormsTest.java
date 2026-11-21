@@ -69,6 +69,18 @@ final class TenantOtpLoginFormsTest {
     }
 
     @Test
+    void distinguishesTheProductAuthenticatorFromProviderSignIn() {
+        assertEquals("Verify sign-in",
+            TenantOtpLoginForms.otpMessage("login-otp.ftl", "doLogIn", "test.s3r.ch"));
+        assertEquals("Code from your test.s3r.ch authenticator",
+            TenantOtpLoginForms.otpMessage("login-otp.ftl", "loginOtpOneTime", "test.s3r.ch"));
+        assertEquals("Set up your test.s3r.ch authenticator",
+            TenantOtpLoginForms.otpMessage("login-config-totp.ftl", "loginTotpTitle", "test.s3r.ch"));
+        assertNull(TenantOtpLoginForms.otpMessage("login.ftl", "doLogIn", "test.s3r.ch"));
+        assertNull(TenantOtpLoginForms.otpMessage("login-otp.ftl", "invalidTotpMessage", "test.s3r.ch"));
+    }
+
+    @Test
     void upstreamOtpPolicyChangesOnlyTheLabelAndIssuerForTheProduct() {
         RealmModel original = (RealmModel) Proxy.newProxyInstance(RealmModel.class.getClassLoader(),
             new Class<?>[] {RealmModel.class}, (proxy, method, args) -> switch (method.getName()) {
