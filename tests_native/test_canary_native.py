@@ -74,6 +74,45 @@ def observe(transport, issuer, revision):
             'jwks': transport.get(issuer + '/protocol/openid-connect/certs').raise_for_status().json()}
 
 
+def test_mapped_client_brands_otp_enrollment_on_the_retained_provider(provider):
+    admin, transport, base, _ = provider
+    name = 'otp-branding-' + uuid.uuid4().hex
+    callback = 'https://test.s3r.ch/api/identity/oauth/callback'
+    issuer = base + '/realms/' + name
+    username = 'otp-member'
+    password = uuid.uuid4().hex + uuid.uuid4().hex
+    headers = {'Authorization': 'Bearer ' + admin.token}
+    created = transport.post('/admin/realms', headers=headers, json={
+        'realm': name, 'enabled': True, 'displayName': 'Internal fixture realm',
+        'clients': [{'clientId': 's3rch-web', 'publicClient': True, 'standardFlowEnabled': True,
+                     'redirectUris': [callback],
+                     'attributes': {'startup.otp.label.test.s3r.ch': 'test.s3r.ch'}}],
+        'users': [{'username': username, 'enabled': True, 'requiredActions': ['CONFIGURE_TOTP'],
+                   'credentials': [{'type': 'password', 'value': password, 'temporary': False}]}],
+    })
+    assert created.status_code == 201
+    try:
+        page = transport.get(issuer + '/protocol/openid-connect/auth', params={
+            'client_id': 's3rch-web', 'redirect_uri': callback, 'response_type': 'code',
+            'scope': 'openid', 'state': uuid.uuid4().hex, 'prompt': 'login',
+        }).raise_for_status()
+        assert '<title>Sign in to Internal fixture realm</title>' in page.text
+        action = urljoin(str(page.url), LoginForm(page.text).action)
+        assert action.startswith(issuer + '/login-actions/')
+        enrollment = transport.post(action, data={'username': username, 'password': password, 'credentialId': ''})
+        for _ in range(3):
+            if not enrollment.is_redirect:
+                break
+            next_page = urljoin(str(enrollment.url), enrollment.headers['location'])
+            assert next_page.startswith(issuer + '/login-actions/')
+            enrollment = transport.get(next_page)
+        enrollment.raise_for_status()
+        assert '<title>Sign in to test.s3r.ch</title>' in enrollment.text
+        assert 'id="kc-totp-secret-qr-code"' in enrollment.text
+    finally:
+        transport.delete('/admin/realms/' + name, headers=headers).raise_for_status()
+
+
 def test_declared_client_login_refresh_and_realm_patch_rollback(provider):
     admin, transport, base, _ = provider
     name = 'canary-' + uuid.uuid4().hex
