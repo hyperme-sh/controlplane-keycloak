@@ -108,6 +108,7 @@ def test_mapped_client_brands_otp_enrollment_on_the_retained_provider(provider):
             enrollment = transport.get(next_page)
         enrollment.raise_for_status()
         assert '<title>Sign in to test.s3r.ch</title>' in enrollment.text
+        assert 'Set up your test.s3r.ch authenticator' in enrollment.text
         assert 'id="kc-totp-secret-qr-code"' in enrollment.text
     finally:
         transport.delete('/admin/realms/' + name, headers=headers).raise_for_status()

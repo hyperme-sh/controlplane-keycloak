@@ -1,5 +1,6 @@
 package sh.hyperme.startup;
 
+import freemarker.template.TemplateMethodModelEx;
 import jakarta.ws.rs.core.Response;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
@@ -64,6 +65,17 @@ final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
         return "login-config-totp.ftl".equals(template) || "login-otp.ftl".equals(template);
     }
 
+    static String otpMessage(String template, String key, String label) {
+        if ("login-config-totp.ftl".equals(template) && "loginTotpTitle".equals(key)) {
+            return "Set up your " + label + " authenticator";
+        }
+        if ("login-otp.ftl".equals(template)) {
+            if ("doLogIn".equals(key)) return "Verify sign-in";
+            if ("loginOtpOneTime".equals(key)) return "Code from your " + label + " authenticator";
+        }
+        return null;
+    }
+
     @Override
     protected Response processTemplate(Theme theme, String templateName, Locale locale) {
         if (isOtpTemplate(templateName) && authenticationSession != null && realm != null
@@ -74,6 +86,12 @@ final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
             if (label != null) {
                 RealmModel brandedRealm = labelledRealm(realm, label);
                 attributes.put("realm", new RealmBean(brandedRealm));
+                if (attributes.get("msg") instanceof TemplateMethodModelEx messages) {
+                    attributes.put("msg", (TemplateMethodModelEx) args -> {
+                        String text = args.size() == 1 ? otpMessage(templateName, args.getFirst().toString(), label) : null;
+                        return text == null ? messages.exec(args) : text;
+                    });
+                }
                 if (user != null && authenticationSession.getAuthenticatedUser() != null
                         && user.getId().equals(authenticationSession.getAuthenticatedUser().getId())
                         && attributes.get("totp") instanceof TotpBean totp) {
