@@ -90,12 +90,20 @@ class StartupTests(unittest.TestCase):
             '/users/' + subject + '/federated-identity': [{
                 'identityProvider': 'startup-nightly', 'userId': upstream, 'userName': 'startup-nightly-operator',
             }],
+            '/clients?clientId=realm-management': [{'id': 'management'}],
+            '/users/' + subject + '/groups?first=0&max=1': [],
+            '/users/' + subject + '/role-mappings/clients/management/composite': [],
             '/users/' + subject + '/role-mappings': {'realmMappings': [{'name': 'default-roles-controlplane'}]},
         }
         admin = Mock()
         admin.get.side_effect = urls.__getitem__
         admin.get_optional.side_effect = urls.get
         self.assertFalse(reconcile(admin, config, person, acl)['keycloak_admin'])
+        for path in ('/groups?first=0&max=1', '/role-mappings/clients/management/composite'):
+            urls['/users/' + subject + path] = [{'id': 'unexpected'}]
+            with self.assertRaises(StartupConflict):
+                reconcile(admin, config, person, acl)
+            urls['/users/' + subject + path] = []
         urls['/users/' + subject + '/role-mappings']['clientMappings'] = {'realm-management': {'mappings': ['realm-admin']}}
         with self.assertRaises(StartupConflict):
             reconcile(admin, config, person, acl)

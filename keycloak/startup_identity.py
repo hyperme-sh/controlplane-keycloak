@@ -36,6 +36,10 @@ def observe_synthetic(admin, config, person, stamp):
     roles = admin.get(user_path + '/role-mappings')
     if roles.get('clientMappings') or {role['name'] for role in roles.get('realmMappings', [])} - {'default-roles-controlplane'}:
         raise StartupConflict('Synthetic operator has unexpected Keycloak authority')
+    management, = admin.get('/clients?clientId=realm-management')
+    management_path = '/role-mappings/clients/' + quote(management['id'], safe='') + '/composite'
+    if admin.get(user_path + '/groups?first=0&max=1') or admin.get(user_path + management_path):
+        raise StartupConflict('Synthetic operator has inherited Keycloak authority')
     return {'status': 'reconciled', 'schema_version': 1, 'mapping_sha256': stamp, 'person_id': subject,
             'broker_subject': subject, 'keycloak_admin': False, 'application_permissions': []}
 
