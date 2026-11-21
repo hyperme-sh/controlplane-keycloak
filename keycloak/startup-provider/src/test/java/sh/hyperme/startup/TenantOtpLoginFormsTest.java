@@ -1,10 +1,14 @@
 package sh.hyperme.startup;
 
+import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.keycloak.models.OTPPolicy;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
@@ -12,6 +16,17 @@ import org.keycloak.models.UserModel;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class TenantOtpLoginFormsTest {
+    @Test
+    void activatesOnlyWithARegularMarkerFile(@TempDir Path directory) throws IOException {
+        Path marker = directory.resolve("startup-otp-labels.enabled");
+        assertFalse(TenantOtpLoginFormsFactory.activationMarkerPresent(marker));
+        Files.createFile(marker);
+        assertTrue(TenantOtpLoginFormsFactory.activationMarkerPresent(marker));
+        assertFalse(TenantOtpLoginFormsFactory.activationMarkerPresent(directory));
+        Path link = Files.createSymbolicLink(directory.resolve("linked-marker"), marker);
+        assertFalse(TenantOtpLoginFormsFactory.activationMarkerPresent(link));
+    }
+
     @Test
     void installingTheStartupArtifactDoesNotSelectTheRenderer() {
         TenantOtpLoginFormsFactory renderer = new TenantOtpLoginFormsFactory();

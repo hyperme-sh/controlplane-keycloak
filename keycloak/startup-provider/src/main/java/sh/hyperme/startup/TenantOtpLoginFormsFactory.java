@@ -21,7 +21,11 @@ public final class TenantOtpLoginFormsFactory extends FreeMarkerLoginFormsProvid
     @Override
     public boolean isSupported(Config.Scope config) {
         return labelsEnabled(System.getenv("KEYCLOAK_OTP_LABELS_ENABLED"))
-                || Files.isRegularFile(OPT_IN, LinkOption.NOFOLLOW_LINKS);
+                || activationMarkerPresent(OPT_IN);
+    }
+
+    static boolean activationMarkerPresent(Path path) {
+        return Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS);
     }
 
     static boolean labelsEnabled(String setting) {
