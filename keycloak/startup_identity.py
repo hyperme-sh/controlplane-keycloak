@@ -7,9 +7,41 @@ from startup_contract import validate, fingerprint
 class StartupConflict(ValueError):pass
 
 
+def observe_synthetic(admin, config, person, stamp):
+    oidc = config['binding']['oidc']
+    subject = person['broker_subject']
+    if subject != oidc['broker_subject'] or person['person_id'] != subject:
+        raise StartupConflict('Configured synthetic subject differs from the reconciled person')
+    alias = oidc['broker']
+    provider = admin.get_optional('/identity-provider/instances/' + quote(alias, safe=''))
+    if (not provider or provider.get('providerId') != 'oidc' or provider.get('enabled') is not True
+            or provider.get('hideOnLogin') is not True or provider.get('trustEmail') is not False
+            or provider.get('storeToken') is not False
+            or provider.get('firstBrokerLoginFlowAlias') != 'deny-unlinked-broker-login'
+            or provider.get('postBrokerLoginFlowAlias') != 'test-startup-github-mfa'):
+        raise StartupConflict('Dedicated TEST OIDC provider policy differs')
+    expected = {'issuer': oidc['issuer'], 'validateSignature': 'true', 'useJwksUrl': 'true',
+                'pkceEnabled': 'true', 'pkceMethod': 'S256', 'clientId': 'startup-nightly-broker'}
+    if any(provider.get('config', {}).get(name) != value for name, value in expected.items()):
+        raise StartupConflict('Dedicated TEST OIDC authority differs')
+
+    user_path = '/users/' + quote(subject, safe='')
+    user = admin.get_optional(user_path)
+    if (not user or user.get('id') != subject or user.get('enabled') is not True
+            or user.get('username') != 'brokered-startup-nightly-operator'):
+        raise StartupConflict('Configured synthetic Keycloak person differs')
+    links = admin.get(user_path + '/federated-identity')
+    if links != [{'identityProvider': alias, 'userId': oidc['subject'], 'userName': 'startup-nightly-operator'}]:
+        raise StartupConflict('Configured synthetic provider link differs')
+    roles = admin.get(user_path + '/role-mappings')
+    if roles.get('clientMappings') or {role['name'] for role in roles.get('realmMappings', [])} - {'default-roles-controlplane'}:
+        raise StartupConflict('Synthetic operator has unexpected Keycloak authority')
+    return {'status': 'reconciled', 'schema_version': 1, 'mapping_sha256': stamp, 'person_id': subject,
+            'broker_subject': subject, 'keycloak_admin': False, 'application_permissions': []}
+
+
 def reconcile(admin,config,person,acl,*,entra_secret=None):
     config=validate(config)
-    entra=config['binding']['entra'];alias=entra['broker'];provider_path='/identity-provider/instances/'+quote(alias,safe='')
     realm=config['binding']['keycloak_admin']['realm']
     if admin.get('').get('realm') != realm:raise StartupConflict('Configured Keycloak realm differs')
     stamp=fingerprint(config)
@@ -17,6 +49,9 @@ def reconcile(admin,config,person,acl,*,entra_secret=None):
         person.get('tenant_id')!=config['owner']['tenant_id'] or not person.get('broker_subject') or
         acl.get('status')!='reconciled' or acl.get('mapping_sha256')!=stamp or acl.get('person_id')!=person.get('person_id')):
         raise StartupConflict('Bound User/Auth and reconciled ACL mapping required')
+    if config['binding']['version'] == 2:
+        return observe_synthetic(admin, config, person, stamp)
+    entra=config['binding']['entra'];alias=entra['broker'];provider_path='/identity-provider/instances/'+quote(alias,safe='')
     subject=person['broker_subject'];encoded=quote(subject,safe='')
     username='startup-'+person['person_id']
     current=admin.get_optional('/users/'+encoded)

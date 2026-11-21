@@ -59,6 +59,49 @@ class StartupTests(unittest.TestCase):
             'tenant_id':self.config['owner']['tenant_id'],'mapping_sha256':stamp,'status':'bound'}
         self.acl={'person_id':self.person['person_id'],'mapping_sha256':stamp,'status':'reconciled'}
         self.admin=Admin(self.config)
+    def test_synthetic_oidc_only_observes_a_prelinked_roleless_identity(self):
+        from unittest.mock import Mock
+        from startup_contract import binding_fingerprint
+
+        config = self.config
+        subject = self.person['person_id']
+        upstream = '76259cb6-a67f-5d78-83ec-8f1cabc0eb44'
+        config['binding'].pop('entra')
+        config['binding'].update(version=2, oidc={
+            'issuer': 'https://auth.test.hyperme.sh/realms/startup-nightly', 'subject': upstream,
+            'broker': 'startup-nightly', 'broker_subject': subject,
+        }, keycloak_admin={'realm': 'controlplane', 'enabled': False})
+        config['binding_sha256'] = binding_fingerprint(config['binding'])
+        config['owner'].update(network_id='hyperme.sh', profile={'email': 'owner@startup-nightly.invalid'},
+                               broker={'issuer': 'https://auth.test.hyperme.sh/realms/controlplane',
+                                       'audience': 'controlplane-frontend'})
+        stamp = fingerprint(config)
+        person = self.person | {'mapping_sha256': stamp}
+        acl = self.acl | {'mapping_sha256': stamp}
+        urls = {
+            '': {'realm': 'controlplane'},
+            '/identity-provider/instances/startup-nightly': {
+                'providerId': 'oidc', 'enabled': True, 'hideOnLogin': True, 'trustEmail': False, 'storeToken': False,
+                'firstBrokerLoginFlowAlias': 'deny-unlinked-broker-login', 'postBrokerLoginFlowAlias': 'test-startup-github-mfa',
+                'config': {'issuer': config['binding']['oidc']['issuer'], 'validateSignature': 'true',
+                           'useJwksUrl': 'true', 'pkceEnabled': 'true', 'pkceMethod': 'S256', 'clientId': 'startup-nightly-broker'},
+            },
+            '/users/' + subject: {'id': subject, 'enabled': True, 'username': 'brokered-startup-nightly-operator'},
+            '/users/' + subject + '/federated-identity': [{
+                'identityProvider': 'startup-nightly', 'userId': upstream, 'userName': 'startup-nightly-operator',
+            }],
+            '/users/' + subject + '/role-mappings': {'realmMappings': [{'name': 'default-roles-controlplane'}]},
+        }
+        admin = Mock()
+        admin.get.side_effect = urls.__getitem__
+        admin.get_optional.side_effect = urls.get
+        self.assertFalse(reconcile(admin, config, person, acl)['keycloak_admin'])
+        urls['/users/' + subject + '/role-mappings']['clientMappings'] = {'realm-management': {'mappings': ['realm-admin']}}
+        with self.assertRaises(StartupConflict):
+            reconcile(admin, config, person, acl)
+        admin.post.assert_not_called()
+        admin.put.assert_not_called()
+
     def test_first_run_and_retry_keep_one_identity_and_separate_admin(self):
         first=reconcile(self.admin,self.config,self.person,self.acl)
         before=copy.deepcopy(self.admin.__dict__)
