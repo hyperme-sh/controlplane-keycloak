@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.keycloak.forms.login.freemarker.FreeMarkerLoginFormsProvider;
+import org.keycloak.forms.login.freemarker.model.RealmBean;
 import org.keycloak.forms.login.freemarker.model.TotpBean;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -48,6 +49,9 @@ final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
                 if (method.getName().equals("getDisplayName")) {
                     return label;
                 }
+                if (method.getName().equals("getDisplayNameHtml")) {
+                    return null;
+                }
                 try {
                     return method.invoke(original, args);
                 } catch (InvocationTargetException error) {
@@ -56,21 +60,27 @@ final class TenantOtpLoginForms extends FreeMarkerLoginFormsProvider {
             });
     }
 
+    static boolean isOtpTemplate(String template) {
+        return "login-config-totp.ftl".equals(template) || "login-otp.ftl".equals(template);
+    }
+
     @Override
     protected Response processTemplate(Theme theme, String templateName, Locale locale) {
-        if ("login-config-totp.ftl".equals(templateName) && authenticationSession != null
-                && realm != null && user != null && authenticationSession.getClient() != null
-                && authenticationSession.getAuthenticatedUser() != null
-                && user.getId().equals(authenticationSession.getAuthenticatedUser().getId())
-                && attributes.get("totp") instanceof TotpBean totp) {
+        if (isOtpTemplate(templateName) && authenticationSession != null && realm != null
+                && authenticationSession.getClient() != null) {
             var client = authenticationSession.getClient();
             String label = productLabel(authenticationSession.getRedirectUri(),
                 client.getRedirectUris(), client.getAttributes());
             if (label != null) {
-                var uri = uriInfo.getBaseUriBuilder().path(uriInfo.getPath())
-                    .replaceQuery(uriInfo.getRequestUri().getQuery());
-                attributes.put("totp", new TotpBean(session, labelledRealm(realm, label), user,
-                    uri, totp.getTotpSecret()));
+                RealmModel brandedRealm = labelledRealm(realm, label);
+                attributes.put("realm", new RealmBean(brandedRealm));
+                if (user != null && authenticationSession.getAuthenticatedUser() != null
+                        && user.getId().equals(authenticationSession.getAuthenticatedUser().getId())
+                        && attributes.get("totp") instanceof TotpBean totp) {
+                    var uri = uriInfo.getBaseUriBuilder().path(uriInfo.getPath())
+                        .replaceQuery(uriInfo.getRequestUri().getQuery());
+                    attributes.put("totp", new TotpBean(session, brandedRealm, user, uri, totp.getTotpSecret()));
+                }
             }
         }
         return super.processTemplate(theme, templateName, locale);
