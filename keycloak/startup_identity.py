@@ -55,6 +55,7 @@ def reconcile(admin,config,person,acl,*,entra_secret=None):
         raise StartupConflict('Bound User/Auth and reconciled ACL mapping required')
     if config['binding']['version'] == 2:
         return observe_synthetic(admin, config, person, stamp)
+    first_fyberlabs = set(config['binding']['organizations']) == {'fyberlabs'}
     entra=config['binding']['entra'];alias=entra['broker'];provider_path='/identity-provider/instances/'+quote(alias,safe='')
     subject=person['broker_subject'];encoded=quote(subject,safe='')
     username='startup-'+person['person_id']
@@ -71,14 +72,23 @@ def reconcile(admin,config,person,acl,*,entra_secret=None):
     if create_provider:
         if not entra_secret:raise StartupConflict('Configured Entra application secret required for new broker')
         issuer=entra['issuer'];base='https://login.microsoftonline.com/'+entra['tenant_id']
-        provider={'alias':alias,'providerId':'startup-entra','enabled':True,'trustEmail':False,
+        provider={'alias':alias,'providerId':'startup-entra','enabled':not first_fyberlabs,'trustEmail':False,
             'storeToken':False,'config':{'issuer':issuer,'clientId':entra['audience'],'clientSecret':entra_secret,
             'validateSignature':'true','useJwksUrl':'true','syncMode':'IMPORT','defaultScope':'openid profile email',
             'disableUserInfo':'true','authorizationUrl':base+'/oauth2/v2.0/authorize',
             'tokenUrl':base+'/oauth2/v2.0/token','jwksUrl':base+'/discovery/v2.0/keys'}}
+        if first_fyberlabs:
+            provider.update(displayName='Microsoft (FyberLabs owner)', hideOnLogin=True)
+            provider['config'].update(clientAuthMethod='client_secret_post', pkceEnabled='true', pkceMethod='S256')
     broker=dict(provider.get('config') or {})
-    if provider.get('providerId') != 'startup-entra' or not provider.get('enabled'):
+    if provider.get('providerId') != 'startup-entra' or (not first_fyberlabs and not provider.get('enabled')):
         raise StartupConflict('Configured startup-entra broker must be installed before reconciliation')
+    if first_fyberlabs and (
+        alias != 'startup-fyberlabs' or provider.get('storeToken') is not False
+        or provider.get('trustEmail') is not False or broker.get('pkceEnabled') != 'true'
+        or broker.get('pkceMethod') != 'S256'
+    ):
+        raise StartupConflict('Dedicated FyberLabs broker policy differs')
     if broker.get('startupMapping') not in (None,stamp):raise StartupConflict('Shared Microsoft broker mapping conflicts')
     expected_issuer=entra['issuer']
     if expected_issuer not in broker.get('issuer','').split(','):
@@ -136,6 +146,8 @@ def reconcile(admin,config,person,acl,*,entra_secret=None):
     if enabled and not present:admin.post(role_path,[role])
     if not completed:
         admin.put('/users/'+encoded,{**current,'attributes':{**current.get('attributes',{}),'startup_complete':['true']}})
+    if first_fyberlabs and (not desired['enabled'] or desired.get('hideOnLogin') is not False):
+        admin.put(provider_path, {**desired, 'enabled': True, 'hideOnLogin': False})
     return {'status':'reconciled','schema_version':1,'mapping_sha256':stamp,'person_id':person['person_id'],
             'broker_subject':subject,'keycloak_admin':enabled,'application_permissions':[]}
 
