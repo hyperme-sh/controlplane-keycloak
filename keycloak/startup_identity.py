@@ -186,8 +186,8 @@ def main():
                 raise StartupConflict('Keycloak identity lookup unavailable') from None
     token=read_private(Path(os.environ['STARTUP_KEYCLOAK_ADMIN_TOKEN_FILE'])).decode().strip()
     config = load(args.config)
-    person = json.loads(args.bound_person.read_text())
-    acl = json.loads(args.acl_result.read_text())
+    person = json.loads(read_private(args.bound_person))
+    acl = json.loads(read_private(args.acl_result))
     if config['binding']['version'] == 2:
         origin = 'https://auth.test.hyperme.sh'
         if os.environ['KEYCLOAK_INTERNAL_URL'].rstrip('/') != origin:
@@ -197,7 +197,7 @@ def main():
             url = origin + '/realms/controlplane/startup-nightly-observation'
             request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token})
             try:
-                with urllib.request.build_opener(_NoRedirect()).open(request, timeout=10) as response:
+                with urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect()).open(request, timeout=10) as response:
                     raw = response.read(8193)
                     if len(raw) > 8192:
                         raise StartupConflict('Bounded Keycloak observation required')
