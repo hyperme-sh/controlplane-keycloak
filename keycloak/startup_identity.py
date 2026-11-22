@@ -1,6 +1,6 @@
 """Reconcile the configured application's broker link and separate realm grant."""
 import json
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 from startup_contract import validate, fingerprint
 
 
@@ -44,15 +44,37 @@ def observe_synthetic(admin, config, person, stamp):
             'broker_subject': subject, 'keycloak_admin': False, 'application_permissions': []}
 
 
-def reconcile(admin,config,person,acl,*,entra_secret=None):
-    config=validate(config)
-    realm=config['binding']['keycloak_admin']['realm']
-    if admin.get('').get('realm') != realm:raise StartupConflict('Configured Keycloak realm differs')
-    stamp=fingerprint(config)
+def configured_state(config, person, acl):
+    stamp = fingerprint(config)
     if (person.get('status')!='bound' or person.get('mapping_sha256')!=stamp or
         person.get('tenant_id')!=config['owner']['tenant_id'] or not person.get('broker_subject') or
         acl.get('status')!='reconciled' or acl.get('mapping_sha256')!=stamp or acl.get('person_id')!=person.get('person_id')):
         raise StartupConflict('Bound User/Auth and reconciled ACL mapping required')
+    return stamp
+
+
+def observe_scoped(config, person, acl, fetch):
+    config = validate(config)
+    if config['binding']['version'] != 2:
+        raise StartupConflict('Synthetic TEST OIDC mapping required')
+    stamp = configured_state(config, person, acl)
+    oidc = config['binding']['oidc']
+    subject = oidc['broker_subject']
+    if person['broker_subject'] != subject or person['person_id'] != subject:
+        raise StartupConflict('Configured synthetic subject differs from the reconciled person')
+    observed = fetch()
+    if observed != {'schema_version': 1, 'realm': 'controlplane', 'broker_subject': subject,
+                    'upstream_subject': oidc['subject'], 'keycloak_admin': False}:
+        raise StartupConflict('Scoped Keycloak operator observation differs')
+    return {'status': 'reconciled', 'schema_version': 1, 'mapping_sha256': stamp, 'person_id': subject,
+            'broker_subject': subject, 'keycloak_admin': False, 'application_permissions': []}
+
+
+def reconcile(admin,config,person,acl,*,entra_secret=None):
+    config=validate(config)
+    realm=config['binding']['keycloak_admin']['realm']
+    if admin.get('').get('realm') != realm:raise StartupConflict('Configured Keycloak realm differs')
+    stamp = configured_state(config, person, acl)
     if config['binding']['version'] == 2:
         return observe_synthetic(admin, config, person, stamp)
     entra=config['binding']['entra'];alias=entra['broker'];provider_path='/identity-provider/instances/'+quote(alias,safe='')
@@ -146,7 +168,7 @@ def main():
     import urllib.error
     import urllib.request
     from pathlib import Path
-    from account_closure import NativeAdmin
+    from account_closure import NativeAdmin, _NoRedirect
     from startup_contract import load,read_private
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config',type=Path,required=True)
@@ -163,10 +185,32 @@ def main():
                 if error.code==404:return None
                 raise StartupConflict('Keycloak identity lookup unavailable') from None
     token=read_private(Path(os.environ['STARTUP_KEYCLOAK_ADMIN_TOKEN_FILE'])).decode().strip()
+    config = load(args.config)
+    person = json.loads(args.bound_person.read_text())
+    acl = json.loads(args.acl_result.read_text())
+    if config['binding']['version'] == 2:
+        origin = 'https://auth.test.hyperme.sh'
+        if os.environ['KEYCLOAK_INTERNAL_URL'].rstrip('/') != origin:
+            raise StartupConflict('Declared TEST observer origin required')
+
+        def fetch():
+            url = origin + '/realms/controlplane/startup-nightly-observation'
+            request = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token})
+            try:
+                with urllib.request.build_opener(_NoRedirect()).open(request, timeout=10) as response:
+                    raw = response.read(8193)
+                    if len(raw) > 8192:
+                        raise StartupConflict('Bounded Keycloak observation required')
+                    return json.loads(raw)
+            except (OSError, ValueError):
+                raise StartupConflict('Scoped Keycloak operator observation unavailable') from None
+
+        print(json.dumps(observe_scoped(config, person, acl, fetch), sort_keys=True))
+        return
     secret_path=os.environ.get('STARTUP_ENTRA_CLIENT_SECRET_FILE')
     secret=read_private(Path(secret_path)).decode().strip() if secret_path else None
     admin=Admin(os.environ['KEYCLOAK_INTERNAL_URL'],os.environ.get('KEYCLOAK_REALM','controlplane'),token)
-    result=reconcile(admin,load(args.config),json.loads(args.bound_person.read_text()),json.loads(args.acl_result.read_text()),entra_secret=secret)
+    result=reconcile(admin,config,person,acl,entra_secret=secret)
     print(json.dumps(result,sort_keys=True))
 
 
