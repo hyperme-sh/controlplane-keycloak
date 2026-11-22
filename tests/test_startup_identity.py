@@ -8,7 +8,7 @@ from urllib.parse import unquote
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'keycloak'))
-from startup_identity import reconcile,StartupConflict
+from startup_identity import observe_scoped,reconcile,StartupConflict
 from startup_contract import fingerprint
 
 
@@ -109,6 +109,19 @@ class StartupTests(unittest.TestCase):
             reconcile(admin, config, person, acl)
         admin.post.assert_not_called()
         admin.put.assert_not_called()
+
+        projection = {'schema_version': 1, 'realm': 'controlplane', 'broker_subject': subject,
+                      'upstream_subject': upstream, 'keycloak_admin': False}
+        fetch = Mock(return_value=projection)
+        self.assertFalse(observe_scoped(config, person, acl, fetch)['keycloak_admin'])
+        fetch.assert_called_once_with()
+        for change in ({'broker_subject': upstream}, {'keycloak_admin': True}, {'admin_config': {}}):
+            with self.assertRaises(StartupConflict):
+                observe_scoped(config, person, acl, lambda: projection | change)
+        fetch.reset_mock()
+        with self.assertRaises(StartupConflict):
+            observe_scoped(config, person | {'broker_subject': upstream}, acl, fetch)
+        fetch.assert_not_called()
 
     def test_first_run_and_retry_keep_one_identity_and_separate_admin(self):
         first=reconcile(self.admin,self.config,self.person,self.acl)
